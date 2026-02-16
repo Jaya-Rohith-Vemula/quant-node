@@ -8,6 +8,7 @@ import {
     Area,
     AreaChart,
 } from 'recharts';
+import { format } from 'date-fns';
 
 interface BacktestChartProps {
     data: any[];
@@ -22,18 +23,44 @@ export const BacktestChart: React.FC<BacktestChartProps> = ({ data }) => {
         );
     }
 
+    const formatDateTick = (tickItem: string) => {
+        try {
+            return format(new Date(tickItem), 'MMM d');
+        } catch (e) {
+            return tickItem;
+        }
+    };
+
+    const formatTooltipLabel = (label: any) => {
+        if (!label) return '';
+        try {
+            return format(new Date(label), 'MMM d, yyyy HH:mm');
+        } catch (e) {
+            return String(label);
+        }
+    };
+
     return (
         <div className="w-full h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
                     <defs>
                         <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#00ff7a" stopOpacity={0.8} />
                             <stop offset="95%" stopColor="#00ff7a" stopOpacity={0} />
                         </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis dataKey="datetime" hide />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} opacity={0.3} />
+                    <XAxis
+                        dataKey="datetime"
+                        tickFormatter={formatDateTick}
+                        stroke="#888"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        minTickGap={40}
+                        dy={10}
+                    />
                     <YAxis
                         stroke="#888"
                         fontSize={12}
@@ -46,6 +73,7 @@ export const BacktestChart: React.FC<BacktestChartProps> = ({ data }) => {
                         contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }}
                         itemStyle={{ color: '#00ff7a', fontWeight: 'bold' }}
                         labelStyle={{ color: '#94a3b8' }}
+                        labelFormatter={formatTooltipLabel}
                         formatter={(value: any) => [`$${parseFloat(value).toLocaleString()}`, 'Portfolio Value']}
                     />
                     <Area
