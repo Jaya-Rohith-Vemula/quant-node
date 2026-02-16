@@ -183,10 +183,12 @@ function App() {
                     </div>
                     <h2 className="text-2xl font-black flex items-center gap-2">
                       {params.symbol} <span>Backtest</span>
-                      <span className="text-sm bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium">
-                        {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} to {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
-                      </span>
                     </h2>
+                  </div>
+                  <div className="animate-in slide-in-from-right duration-500">
+                    <span className="text-sm bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium">
+                      {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} to {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
+                    </span>
                   </div>
                 </header>
 
@@ -209,7 +211,6 @@ function App() {
                     label="Max Drawdown"
                     value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
                     icon={<TrendingDown size={20} />}
-                    negative
                     loading={loading}
                   />
                   <StatCard
