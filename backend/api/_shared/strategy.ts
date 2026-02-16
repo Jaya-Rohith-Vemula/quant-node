@@ -109,6 +109,7 @@ export async function runBacktest(params: StrategyParams) {
     let referencePrice = 0;
     let hasTraded = false;
     let trades: TradeRecord[] = [];
+    let equityHistory: { datetime: string, accountBalance: number }[] = [];
     let tradeNoCounter = 1;
     let maxSeenToday = 0;
     let currentDateStr = '';
@@ -135,7 +136,8 @@ export async function runBacktest(params: StrategyParams) {
         return maxHigh;
     };
 
-    for (const row of rows as any) {
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
         const currentPrice = row.close;
         const currentHigh = row.high;
         const currentTime = row.datetime;
@@ -155,6 +157,12 @@ export async function runBacktest(params: StrategyParams) {
 
         // Drawdown calculation
         const currentEquity = currentBalance + (totalSharesHeld * currentPrice);
+
+        // Record equity history (sampled for responsiveness, max ~1000 points)
+        const sampleRate = Math.max(1, Math.floor(rows.length / 1000));
+        if (i % sampleRate === 0 || i === rows.length - 1) {
+            equityHistory.push({ datetime: currentTime, accountBalance: currentEquity });
+        }
 
         if (currentEquity > peakValue) peakValue = currentEquity;
         if (currentEquity < minEquity) {
@@ -266,6 +274,7 @@ export async function runBacktest(params: StrategyParams) {
 
     return {
         trades,
+        equityHistory,
         summary: {
             symbol,
             totalProfitRealized: totalProfit,

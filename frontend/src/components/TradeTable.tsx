@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Skeleton } from './ui/Skeleton';
 
 interface Trade {
     tradeNo: number;
@@ -13,9 +14,10 @@ interface Trade {
 
 interface TradeTableProps {
     trades: Trade[];
+    loading?: boolean;
 }
 
-export const TradeTable: React.FC<TradeTableProps> = ({ trades }) => {
+export const TradeTable: React.FC<TradeTableProps> = ({ trades, loading }) => {
     return (
         <div className="mt-8 overflow-hidden rounded-xl border border-white/10 glass">
             <div className="bg-white/5 px-6 py-4 border-b border-white/10">
@@ -34,29 +36,44 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades }) => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                        {trades.slice().reverse().map((trade) => (
-                            <tr key={`${trade.tradeNo}-${trade.datetime}`} className="hover:bg-white/5 transition-colors">
-                                <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{trade.tradeNo}</td>
-                                <td className="px-6 py-4">
-                                    <span className={`flex items-center gap-1 text-sm font-bold ${trade.type === 'BUY' ? 'text-blue-400' : 'text-primary'}`}>
-                                        {trade.type === 'BUY' ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />}
-                                        {trade.type}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-sm font-mono">${trade.price.toFixed(2)}</td>
-                                <td className="px-6 py-4 text-sm font-mono">{trade.shares.toFixed(2)}</td>
-                                <td className={`px-6 py-4 text-sm font-mono ${trade.profit > 0 ? 'text-primary' : trade.profit < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
-                                    {trade.profit !== 0 ? `$${trade.profit.toFixed(2)}` : '-'}
-                                </td>
-                                <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap">{trade.datetime}</td>
-                            </tr>
-                        ))}
-                        {trades.length === 0 && (
-                            <tr>
-                                <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic">
-                                    No trades recorded yet. Adjust parameters and run simulation.
-                                </td>
-                            </tr>
+                        {loading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <tr key={`skeleton-${i}`}>
+                                    <td className="px-6 py-4"><Skeleton className="h-4 w-4" /></td>
+                                    <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
+                                    <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                                    <td className="px-6 py-4"><Skeleton className="h-4 w-12" /></td>
+                                    <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
+                                    <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
+                                </tr>
+                            ))
+                        ) : (
+                            <>
+                                {trades.slice().reverse().map((trade) => (
+                                    <tr key={`${trade.tradeNo}-${trade.datetime}`} className="hover:bg-white/5 transition-colors">
+                                        <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{trade.tradeNo}</td>
+                                        <td className="px-6 py-4">
+                                            <span className={`flex items-center gap-1 text-sm font-bold ${trade.type === 'BUY' ? 'text-blue-400' : 'text-primary'}`}>
+                                                {trade.type === 'BUY' ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />}
+                                                {trade.type}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm font-mono">${trade.price.toFixed(2)}</td>
+                                        <td className="px-6 py-4 text-sm font-mono">{trade.shares.toFixed(2)}</td>
+                                        <td className={`px-6 py-4 text-sm font-mono ${trade.profit > 0 ? 'text-primary' : trade.profit < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                                            {trade.profit !== 0 ? `$${trade.profit.toFixed(2)}` : '-'}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap">{trade.datetime}</td>
+                                    </tr>
+                                ))}
+                                {trades.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic">
+                                            No trades recorded yet. Adjust parameters and run simulation.
+                                        </td>
+                                    </tr>
+                                )}
+                            </>
                         )}
                     </tbody>
                 </table>

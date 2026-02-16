@@ -11,6 +11,7 @@ import {
 import { ParameterSlider } from './components/ParameterSlider';
 import { BacktestChart } from './components/BacktestChart';
 import { TradeTable } from './components/TradeTable';
+import { Skeleton } from './components/ui/Skeleton';
 
 interface BacktestSummary {
   symbol: string;
@@ -40,8 +41,13 @@ function App() {
     endDate: '2025-12-31'
   });
 
-  const [results, setResults] = useState<{ trades: any[], summary: BacktestSummary | null }>({
+  const [results, setResults] = useState<{
+    trades: any[],
+    equityHistory: any[],
+    summary: BacktestSummary | null
+  }>({
     trades: [],
+    equityHistory: [],
     summary: null
   });
 
@@ -207,14 +213,20 @@ function App() {
             </h2>
           </div>
 
-          {results.summary && (
+          {(results.summary || loading) && (
             <div className="flex gap-4">
               <div className="text-right">
                 <span className="text-xs text-muted-foreground block uppercase font-bold tracking-tighter">Total Return</span>
-                <span className={`text-2xl font-black ${results.summary.totalProfitRealized >= 0 ? 'text-primary' : 'text-red-400'}`}>
-                  {results.summary.totalProfitRealized >= 0 ? '+' : ''}
-                  ${results.summary.totalProfitRealized.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-8 w-32 mt-1 ml-auto" />
+                ) : (
+                  results.summary && (
+                    <span className={`text-2xl font-black ${results.summary.totalProfitRealized >= 0 ? 'text-primary' : 'text-red-400'}`}>
+                      {results.summary.totalProfitRealized >= 0 ? '+' : ''}
+                      ${results.summary.totalProfitRealized.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                  )
+                )}
               </div>
             </div>
           )}
@@ -223,27 +235,31 @@ function App() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <StatCard
-            label="Final Equity"
+            label="Total Net Worth"
             value={`$${results.summary?.finalAccountValue.toLocaleString() || '0'}`}
             icon={<DollarSign size={20} />}
             trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
+            loading={loading}
           />
           <StatCard
             label="Total Profit"
             value={`$${results.summary?.totalProfitRealized.toLocaleString() || '0'}`}
             icon={<TrendingUp size={20} />}
             trend={results.summary ? (results.summary.totalProfitRealized > 0) : null}
+            loading={loading}
           />
           <StatCard
             label="Max Drawdown"
             value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
             icon={<TrendingDown size={20} />}
             negative
+            loading={loading}
           />
           <StatCard
             label="Trades Executed"
             value={results.trades.length.toString()}
             icon={<Activity size={20} />}
+            loading={loading}
           />
         </div>
 
@@ -258,11 +274,15 @@ function App() {
               </div>
             </div>
           </div>
-          <BacktestChart data={results.trades} />
+          {loading ? (
+            <Skeleton className="h-[300px] w-full" />
+          ) : (
+            <BacktestChart data={results.equityHistory} />
+          )}
         </div>
 
         {/* Trade History */}
-        <TradeTable trades={results.trades} />
+        <TradeTable trades={results.trades} loading={loading} />
 
         {/* Unsold Inventory Info */}
         {results.summary && results.summary.unsoldShares > 0 && (
@@ -285,21 +305,29 @@ function App() {
   );
 }
 
-function StatCard({ label, value, icon, trend, negative }: any) {
+function StatCard({ label, value, icon, trend, negative, loading }: any) {
   return (
     <div className="p-6 rounded-2xl border border-white/10 glass hover:border-white/20 transition-all group">
       <div className="flex justify-between items-start mb-4">
         <div className="bg-secondary p-2 rounded-xl text-muted-foreground group-hover:text-white transition-colors">
           {icon}
         </div>
-        {trend !== null && trend !== undefined && (
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trend ? 'bg-primary/10 text-primary' : 'bg-red-500/10 text-red-400'}`}>
-            {trend ? 'BULLISH' : 'BEARISH'}
-          </span>
+        {loading ? (
+          <Skeleton className="h-4 w-12 rounded-full" />
+        ) : (
+          trend !== null && trend !== undefined && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trend ? 'bg-primary/10 text-primary' : 'bg-red-500/10 text-red-400'}`}>
+              {trend ? 'BULLISH' : 'BEARISH'}
+            </span>
+          )
         )}
       </div>
       <div className="text-muted-foreground text-xs font-bold uppercase tracking-widest mb-1">{label}</div>
-      <div className={`text-2xl font-black ${negative ? 'text-red-400' : ''}`}>{value}</div>
+      {loading ? (
+        <Skeleton className="h-8 w-24" />
+      ) : (
+        <div className={`text-2xl font-black ${negative ? 'text-red-400' : ''}`}>{value}</div>
+      )}
     </div>
   );
 }
