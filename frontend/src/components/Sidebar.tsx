@@ -5,7 +5,8 @@ import {
     Play,
     LineChart,
     X,
-    RotateCcw
+    RotateCcw,
+    BookOpen
 } from 'lucide-react';
 import { ModeToggle } from './ModeToggle';
 import { format } from "date-fns";
@@ -26,12 +27,15 @@ interface SidebarProps {
     onParamChange: (key: string, value: any) => void;
     onResetParams: () => void;
     onNavigateHome: () => void;
+    onNavigateToSimulator: () => void;
+    onNavigateToGuide: () => void;
     onRunBacktest: () => void;
     mobileOpen?: boolean;
     setMobileOpen?: (open: boolean) => void;
+    activePage: 'simulator' | 'guide';
 }
 
-export function Sidebar({ params, loading, onParamChange, onResetParams, onNavigateHome, onRunBacktest, mobileOpen, setMobileOpen }: SidebarProps) {
+export function Sidebar({ params, loading, onParamChange, onResetParams, onNavigateHome, onNavigateToSimulator, onNavigateToGuide, onRunBacktest, mobileOpen, setMobileOpen, activePage }: SidebarProps) {
     const [startDateOpen, setStartDateOpen] = useState(false);
     const [endDateOpen, setEndDateOpen] = useState(false);
 
@@ -45,10 +49,10 @@ export function Sidebar({ params, loading, onParamChange, onResetParams, onNavig
                     onClick={onNavigateHome}
                     className="flex items-center gap-3 hover:opacity-80 transition-opacity active:scale-[0.98] group"
                 >
-                    <div className="bg-primary/20 p-2 rounded-lg group-hover:bg-primary/30 transition-colors">
+                    <div className="bg-primary/20 p-2 rounded-lg group-hover:bg-primary/30 transition-colors cursor-pointer">
                         <LineChart className="text-primary" size={20} />
                     </div>
-                    <h1 className="text-xl font-bold tracking-tight text-foreground">Quant Node</h1>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground cursor-pointer">Quant Node</h1>
                 </button>
                 <div className="flex items-center gap-2">
                     <ModeToggle />
@@ -61,6 +65,29 @@ export function Sidebar({ params, loading, onParamChange, onResetParams, onNavig
                         </button>
                     )}
                 </div>
+            </div>
+
+            <div className="px-6 py-4 border-b border-border space-y-1">
+                <button
+                    onClick={onNavigateToSimulator}
+                    className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all active:scale-[0.98] cursor-pointer",
+                        activePage === 'simulator' ? "bg-primary/10 text-primary font-bold shadow-[inset_0_0_10px_rgba(var(--primary-rgb),0.1)]" : "text-muted-foreground hover:bg-secondary/50"
+                    )}
+                >
+                    <LineChart size={18} />
+                    <span>Simulator</span>
+                </button>
+                <button
+                    onClick={onNavigateToGuide}
+                    className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all active:scale-[0.98] cursor-pointer",
+                        activePage === 'guide' ? "bg-primary/10 text-primary font-bold shadow-[inset_0_0_10px_rgba(var(--primary-rgb),0.1)]" : "text-muted-foreground hover:bg-secondary/50"
+                    )}
+                >
+                    <BookOpen size={18} />
+                    <span>How it works</span>
+                </button>
             </div>
 
             <div className="p-6 space-y-2">
@@ -199,7 +226,7 @@ export function Sidebar({ params, loading, onParamChange, onResetParams, onNavig
                 <button
                     onClick={onRunBacktest}
                     disabled={loading}
-                    className="w-full mt-6 bg-primary text-primary-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 shadow-xl"
+                    className="w-full mt-6 bg-primary text-primary-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 shadow-xl cursor-pointer"
                 >
                     {loading ? (
                         <div className="h-5 w-5 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin rounded-full" />

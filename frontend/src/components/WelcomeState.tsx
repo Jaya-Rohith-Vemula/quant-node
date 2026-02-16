@@ -1,11 +1,12 @@
-import { LineChart, Settings, Zap, BarChart3, MousePointer2 } from 'lucide-react';
+import { LineChart, Settings, Zap, BarChart3, MousePointer2, BookOpen } from 'lucide-react';
 import { FeatureCard } from './FeatureCard';
 
 interface WelcomeStateProps {
     onOpenSidebar: () => void;
+    onNavigateToGuide: () => void;
 }
 
-export function WelcomeState({ onOpenSidebar }: WelcomeStateProps) {
+export function WelcomeState({ onOpenSidebar, onNavigateToGuide }: WelcomeStateProps) {
     return (
         <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in zoom-in duration-700 py-12">
             <div className="relative">
@@ -21,13 +22,22 @@ export function WelcomeState({ onOpenSidebar }: WelcomeStateProps) {
                     The ultimate grid trading backtester. Configure your strategy parameters and hit <span className="text-primary font-bold">Run Simulation</span> to analyze market behavior.
                 </p>
 
-                <button
-                    onClick={onOpenSidebar}
-                    className="lg:hidden w-full bg-primary text-primary-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg mt-4"
-                >
-                    <Settings size={18} />
-                    Start Configuring
-                </button>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+                    <button
+                        onClick={onOpenSidebar}
+                        className="lg:hidden w-full sm:w-auto px-8 bg-primary text-primary-foreground font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] cursor-pointer"
+                    >
+                        <Settings size={18} />
+                        Start Configuring
+                    </button>
+                    <button
+                        onClick={onNavigateToGuide}
+                        className="w-full sm:w-auto px-8 bg-secondary/50 backdrop-blur-md text-foreground font-bold py-3.5 rounded-2xl border border-border/50 flex items-center justify-center gap-2 hover:bg-secondary/80 active:scale-95 transition-all shadow-sm group cursor-pointer"
+                    >
+                        <BookOpen size={18} className="text-primary group-hover:rotate-12 transition-transform" />
+                        Learn How it Works
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl">
