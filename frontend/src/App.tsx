@@ -6,7 +6,9 @@ import {
   Play,
   Activity,
   TrendingDown,
-  Info
+  Briefcase,
+  Target,
+  Wallet
 } from 'lucide-react';
 import { ParameterSlider } from './components/ParameterSlider';
 import { BacktestChart } from './components/BacktestChart';
@@ -223,7 +225,7 @@ function App() {
                   results.summary && (
                     <span className={`text-2xl font-black ${results.summary.totalProfitRealized >= 0 ? 'text-primary' : 'text-red-400'}`}>
                       {results.summary.totalProfitRealized >= 0 ? '+' : ''}
-                      ${results.summary.totalProfitRealized.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      ${results.summary.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   )
                 )}
@@ -232,18 +234,17 @@ function App() {
           )}
         </header>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <StatCard
             label="Total Net Worth"
-            value={`$${results.summary?.finalAccountValue.toLocaleString() || '0'}`}
+            value={`$${results.summary?.finalAccountValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
             icon={<DollarSign size={20} />}
             trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
             loading={loading}
           />
           <StatCard
             label="Total Profit"
-            value={`$${results.summary?.totalProfitRealized.toLocaleString() || '0'}`}
+            value={`$${results.summary?.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
             icon={<TrendingUp size={20} />}
             trend={results.summary ? (results.summary.totalProfitRealized > 0) : null}
             loading={loading}
@@ -259,6 +260,39 @@ function App() {
             label="Trades Executed"
             value={results.trades.length.toString()}
             icon={<Activity size={20} />}
+            loading={loading}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <StatCard
+            label="Available Cash"
+            value={`$${results.summary?.currentCashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}`}
+            icon={<Wallet size={20} className="text-blue-400" />}
+            loading={loading}
+          />
+          <StatCard
+            label="Unsold Shares"
+            value={results.summary?.unsoldShares.toFixed(2) || '0'}
+            icon={<Briefcase size={20} className="text-orange-400" />}
+            loading={loading}
+          />
+          <StatCard
+            label="Avg Cost Basis"
+            value={`$${results.summary?.averagePriceUnsold.toFixed(2) || '0'}`}
+            icon={<Target size={20} className="text-purple-400" />}
+            loading={loading}
+          />
+          <StatCard
+            label="All-Time High"
+            value={`$${results.summary?.peakValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+            icon={<TrendingUp size={20} className="text-primary" />}
+            loading={loading}
+          />
+          <StatCard
+            label="Peak Growth"
+            value={`${results.summary ? (((results.summary.peakValue / results.summary.initialBalance) - 1) * 100).toFixed(2) : '0'}%`}
+            icon={<Activity size={20} className="text-primary" />}
             loading={loading}
           />
         </div>
@@ -284,22 +318,6 @@ function App() {
         {/* Trade History */}
         <TradeTable trades={results.trades} loading={loading} />
 
-        {/* Unsold Inventory Info */}
-        {results.summary && results.summary.unsoldShares > 0 && (
-          <div className="mt-8 p-6 rounded-xl bg-blue-500/5 border border-blue-500/20 flex items-start gap-4">
-            <div className="bg-blue-500/20 p-2 rounded-lg">
-              <Info className="text-blue-400" size={20} />
-            </div>
-            <div>
-              <h4 className="font-bold text-blue-400">Inventory Status</h4>
-              <p className="text-sm text-blue-100/60 mt-1">
-                You currently hold <span className="text-blue-200 font-mono font-bold">{results.summary.unsoldShares.toFixed(2)}</span> shares
-                bought at an average price of <span className="text-blue-200 font-mono font-bold">${results.summary.averagePriceUnsold.toFixed(2)}</span>.
-                These are not yet sold as they haven't met the <span className="text-blue-200 font-bold">{params.moveUpPercent}%</span> profit target.
-              </p>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );
