@@ -19,14 +19,14 @@ interface TradeTableProps {
 
 export const TradeTable: React.FC<TradeTableProps> = ({ trades, loading }) => {
     return (
-        <div className="mt-8 overflow-hidden rounded-xl border border-white/10 glass">
-            <div className="bg-white/5 px-6 py-4 border-b border-white/10">
+        <div className="mt-8 overflow-hidden rounded-xl border border-border glass">
+            <div className="bg-muted/50 px-6 py-4 border-b border-border">
                 <h3 className="font-semibold">Trade Execution History</h3>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left">
                     <thead>
-                        <tr className="text-xs uppercase text-muted-foreground bg-white/5">
+                        <tr className="text-xs uppercase text-muted-foreground bg-muted/30">
                             <th className="px-6 py-3 font-medium">No</th>
                             <th className="px-6 py-3 font-medium">Type</th>
                             <th className="px-6 py-3 font-medium">Price</th>
@@ -35,7 +35,7 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, loading }) => {
                             <th className="px-6 py-3 font-medium">Date/Time</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
+                    <tbody className="divide-y divide-border">
                         {loading ? (
                             Array.from({ length: 5 }).map((_, i) => (
                                 <tr key={`skeleton-${i}`}>
@@ -50,7 +50,7 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, loading }) => {
                         ) : (
                             <>
                                 {trades.slice().reverse().map((trade) => (
-                                    <tr key={`${trade.tradeNo}-${trade.datetime}`} className="hover:bg-white/5 transition-colors">
+                                    <tr key={`${trade.tradeNo}-${trade.datetime}`} className="hover:bg-muted/30 transition-colors">
                                         <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{trade.tradeNo}</td>
                                         <td className="px-6 py-4">
                                             <span className={`flex items-center gap-1 text-sm font-bold ${trade.type === 'BUY' ? 'text-blue-400' : 'text-primary'}`}>

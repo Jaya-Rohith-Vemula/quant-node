@@ -17,7 +17,7 @@ interface BacktestChartProps {
 export const BacktestChart: React.FC<BacktestChartProps> = ({ data }) => {
     if (!data || data.length === 0) {
         return (
-            <div className="h-full w-full flex items-center justify-center text-muted-foreground italic bg-secondary/20 rounded-xl border border-dashed border-white/10">
+            <div className="h-full w-full flex items-center justify-center text-muted-foreground italic bg-secondary/20 rounded-xl border border-dashed border-border">
                 No performance data to display. Run a backtest to see results.
             </div>
         );
@@ -50,7 +50,7 @@ export const BacktestChart: React.FC<BacktestChartProps> = ({ data }) => {
                             <stop offset="95%" stopColor="#00ff7a" stopOpacity={0} />
                         </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} opacity={0.3} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border" vertical={false} opacity={0.3} />
                     <XAxis
                         dataKey="datetime"
                         tickFormatter={formatDateTick}
@@ -70,9 +70,13 @@ export const BacktestChart: React.FC<BacktestChartProps> = ({ data }) => {
                         tickLine={false}
                     />
                     <Tooltip
-                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }}
-                        itemStyle={{ color: '#00ff7a', fontWeight: 'bold' }}
-                        labelStyle={{ color: '#94a3b8' }}
+                        contentStyle={{
+                            backgroundColor: 'hsl(var(--popover))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '12px',
+                        }}
+                        itemStyle={{ color: 'hsl(var(--primary))', fontWeight: 'bold' }}
+                        labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
                         labelFormatter={formatTooltipLabel}
                         formatter={(value: any) => [`$${parseFloat(value).toLocaleString()}`, 'Portfolio Value']}
                     />

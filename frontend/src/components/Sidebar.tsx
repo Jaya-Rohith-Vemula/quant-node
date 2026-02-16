@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import {
     Settings,
-    Activity,
     Calendar as CalendarIcon,
-    Play
+    Play,
+    LineChart
 } from 'lucide-react';
+import { ModeToggle } from './ModeToggle';
 import { format } from "date-fns";
 import { ParameterSlider } from './ParameterSlider';
 import { Button } from "./ui/button";
@@ -24,13 +26,19 @@ interface SidebarProps {
 }
 
 export function Sidebar({ params, loading, onParamChange, onRunBacktest }: SidebarProps) {
+    const [startDateOpen, setStartDateOpen] = useState(false);
+    const [endDateOpen, setEndDateOpen] = useState(false);
+
     return (
-        <aside className="w-80 border-r border-white/10 flex flex-col glass overflow-y-auto flex-shrink-0 relative z-20">
-            <div className="p-6 border-b border-white/10 flex items-center gap-3">
-                <div className="bg-primary/20 p-2 rounded-lg">
-                    <Activity className="text-primary" size={20} />
+        <aside className="w-80 border-r border-border flex flex-col glass overflow-y-auto flex-shrink-0 relative z-20">
+            <div className="p-6 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="bg-primary/20 p-2 rounded-lg">
+                        <LineChart className="text-primary" size={20} />
+                    </div>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground">Quant Node</h1>
                 </div>
-                <h1 className="text-xl font-bold tracking-tight">Quant Node</h1>
+                <ModeToggle />
             </div>
 
             <div className="p-6 space-y-2">
@@ -47,14 +55,14 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                             value={params.symbol}
                             onChange={(e) => onParamChange('symbol', e.target.value.toUpperCase())}
                             placeholder="e.g. SOFI"
-                            className="w-full bg-secondary/50 border border-white/5 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary text-sm font-mono mb-2 placeholder:text-muted-foreground/30"
+                            className="w-full bg-secondary/50 border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary text-sm font-mono mb-2 placeholder:text-muted-foreground/30 text-foreground"
                         />
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 pb-4">
                         <div className="space-y-1">
                             <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">Start Date</label>
-                            <Popover>
+                            <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
                                         variant={"outline"}
@@ -63,15 +71,20 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                                             !params.startDate && "text-muted-foreground"
                                         )}
                                     >
-                                        <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                                        <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                                         {params.startDate ? format(new Date(params.startDate + 'T00:00:00'), "PPP") : <span>Pick a date</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 bg-black border-white/10" align="start">
+                                <PopoverContent className="w-auto p-0 bg-popover border-border" align="start">
                                     <Calendar
                                         mode="single"
                                         selected={new Date(params.startDate + 'T00:00:00')}
-                                        onSelect={(date) => date && onParamChange('startDate', format(date, "yyyy-MM-dd"))}
+                                        onSelect={(date) => {
+                                            if (date) {
+                                                onParamChange('startDate', format(date, "yyyy-MM-dd"));
+                                                setStartDateOpen(false);
+                                            }
+                                        }}
                                         captionLayout="dropdown"
                                         initialFocus
                                     />
@@ -80,7 +93,7 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                         </div>
                         <div className="space-y-1">
                             <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">End Date</label>
-                            <Popover>
+                            <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
                                         variant={"outline"}
@@ -89,15 +102,20 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                                             !params.endDate && "text-muted-foreground"
                                         )}
                                     >
-                                        <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                                        <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                                         {params.endDate ? format(new Date(params.endDate + 'T00:00:00'), "PPP") : <span>Pick a date</span>}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 bg-black border-white/10" align="start">
+                                <PopoverContent className="w-auto p-0 bg-popover border-border" align="start">
                                     <Calendar
                                         mode="single"
                                         selected={new Date(params.endDate + 'T00:00:00')}
-                                        onSelect={(date) => date && onParamChange('endDate', format(date, "yyyy-MM-dd"))}
+                                        onSelect={(date) => {
+                                            if (date) {
+                                                onParamChange('endDate', format(date, "yyyy-MM-dd"));
+                                                setEndDateOpen(false);
+                                            }
+                                        }}
                                         captionLayout="dropdown"
                                         initialFocus
                                     />
@@ -155,7 +173,7 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                 <button
                     onClick={onRunBacktest}
                     disabled={loading}
-                    className="w-full mt-6 bg-primary text-primary-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(0,255,122,0.2)]"
+                    className="w-full mt-6 bg-primary text-primary-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 shadow-xl"
                 >
                     {loading ? (
                         <div className="h-5 w-5 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin rounded-full" />

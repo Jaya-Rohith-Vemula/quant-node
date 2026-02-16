@@ -12,10 +12,10 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon, trend, negative, loading }: StatCardProps) {
     return (
-        <div className="p-5 rounded-2xl border border-white/10 glass hover:border-white/20 transition-all group">
+        <div className="p-5 rounded-2xl border border-border glass hover:border-border/60 transition-all group">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2.5">
-                    <div className="bg-secondary p-1.5 rounded-lg text-muted-foreground group-hover:text-white transition-colors">
+                    <div className="bg-secondary p-1.5 rounded-lg text-muted-foreground group-hover:text-foreground transition-colors">
                         {icon}
                     </div>
                     <div className="text-muted-foreground text-[14px] font-bold uppercase tracking-widest">{label}</div>

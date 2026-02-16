@@ -6,7 +6,7 @@ export function WelcomeState() {
         <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in zoom-in duration-700">
             <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full" />
-                <div className="relative bg-secondary/30 p-8 rounded-3xl border border-white/10 glass">
+                <div className="relative bg-secondary/30 p-8 rounded-3xl border border-border glass">
                     <LineChart size={64} className="text-primary animate-pulse" />
                 </div>
             </div>
