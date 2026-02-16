@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface ParameterSliderProps {
     label: string;
@@ -19,6 +19,19 @@ export const ParameterSlider: React.FC<ParameterSliderProps> = ({
     unit = '',
     onChange,
 }) => {
+    const [localValue, setLocalValue] = useState(value);
+
+    // Sync local value with prop if prop changes externally
+    useEffect(() => {
+        setLocalValue(value);
+    }, [value]);
+
+    const handleCommit = () => {
+        if (localValue !== value) {
+            onChange(localValue);
+        }
+    };
+
     return (
         <div className="space-y-3 py-4 border-b border-border last:border-0">
             <div className="flex justify-between items-center px-1">
@@ -26,7 +39,7 @@ export const ParameterSlider: React.FC<ParameterSliderProps> = ({
                     {label}
                 </label>
                 <span className="text-foreground font-bold text-lg">
-                    {value}{unit}
+                    {localValue}{unit}
                 </span>
             </div>
             <input
@@ -34,8 +47,10 @@ export const ParameterSlider: React.FC<ParameterSliderProps> = ({
                 min={min}
                 max={max}
                 step={step}
-                value={value}
-                onChange={(e) => onChange(parseFloat(e.target.value))}
+                value={localValue}
+                onChange={(e) => setLocalValue(parseFloat(e.target.value))}
+                onMouseUp={handleCommit}
+                onTouchEnd={handleCommit}
                 className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-muted-foreground"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground px-1 font-mono">

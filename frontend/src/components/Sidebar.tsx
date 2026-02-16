@@ -79,6 +79,7 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                                     <Calendar
                                         mode="single"
                                         selected={new Date(params.startDate + 'T00:00:00')}
+                                        defaultMonth={new Date(params.startDate + 'T00:00:00')}
                                         onSelect={(date) => {
                                             if (date) {
                                                 onParamChange('startDate', format(date, "yyyy-MM-dd"));
@@ -110,6 +111,7 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                                     <Calendar
                                         mode="single"
                                         selected={new Date(params.endDate + 'T00:00:00')}
+                                        defaultMonth={new Date(params.endDate + 'T00:00:00')}
                                         onSelect={(date) => {
                                             if (date) {
                                                 onParamChange('endDate', format(date, "yyyy-MM-dd"));

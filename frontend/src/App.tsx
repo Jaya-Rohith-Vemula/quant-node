@@ -7,6 +7,7 @@ import {
   Target,
   Wallet,
   Activity,
+  Play
 } from 'lucide-react';
 import { format } from "date-fns";
 import { BacktestChart } from './components/BacktestChart';
@@ -84,6 +85,9 @@ function App() {
     summary: null
   });
 
+  const [lastRunParams, setLastRunParams] = useState<BacktestParams | null>(null);
+  const isStale = !!results.summary && lastRunParams && JSON.stringify(params) !== JSON.stringify(lastRunParams);
+
   const runBacktest = async () => {
     console.log('Initiating backtest with params:', params);
     setLoading(true);
@@ -102,6 +106,7 @@ function App() {
       }
 
       setResults(data);
+      setLastRunParams({ ...params });
       if (data.trades.length === 0) {
         console.warn('Backend returned zero trades.');
         setAlertConfig({
@@ -140,7 +145,33 @@ function App() {
 
         {/* Main Content */}
         <main className="flex-1 p-8 overflow-y-auto relative">
-          <div className="max-w-7xl mx-auto h-full flex flex-col">
+          {isStale && !loading && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center animate-in fade-in duration-300">
+              <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px]" />
+              <div className="relative bg-card/90 border border-primary/50 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm glass mx-4">
+                <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Activity className="text-primary animate-pulse" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Settings Modified</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Your parameters have changed. Run the simulation again to update the results with the new data.
+                  </p>
+                </div>
+                <button
+                  onClick={runBacktest}
+                  className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+                >
+                  <Play size={16} fill="currentColor" />
+                  Update Simulation
+                </button>
+              </div>
+            </div>
+          )}
+          <div className={cn(
+            "max-w-7xl mx-auto h-full flex flex-col transition-all duration-300",
+            (isStale && !loading) && "opacity-50 blur-[1px] pointer-events-none scale-[0.99]"
+          )}>
             {!results.summary && !loading ? (
               <WelcomeState />
             ) : (
@@ -151,7 +182,7 @@ function App() {
                       <TrendingUp size={16} />
                       Performance Overview
                     </div>
-                    <h2 className="text-3xl font-black flex items-center gap-3">
+                    <h2 className="text-2xl font-black flex items-center gap-2">
                       {params.symbol} <span>Backtest</span>
                       <span className="text-sm bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium">
                         {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} to {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
