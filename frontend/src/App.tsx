@@ -8,12 +8,35 @@ import {
   TrendingDown,
   Briefcase,
   Target,
-  Wallet
+  Wallet,
+  Calendar as CalendarIcon,
+  LineChart,
+  BarChart3,
+  MousePointer2,
+  Zap
 } from 'lucide-react';
+import { format } from "date-fns";
 import { ParameterSlider } from './components/ParameterSlider';
 import { BacktestChart } from './components/BacktestChart';
 import { TradeTable } from './components/TradeTable';
 import { Skeleton } from './components/ui/Skeleton';
+import { Button } from "./components/ui/button";
+import { Calendar } from "./components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "./components/ui/popover";
+import { cn } from "./lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./components/ui/alert-dialog";
 
 interface BacktestSummary {
   symbol: string;
@@ -33,6 +56,17 @@ interface BacktestSummary {
 function App() {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Cooking the required details...');
+  const [alertConfig, setAlertConfig] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    variant: 'default' | 'error';
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    variant: 'default'
+  });
 
   const loadingMessages = [
     "Cooking the required details...",
@@ -98,11 +132,21 @@ function App() {
       setResults(data);
       if (data.trades.length === 0) {
         console.warn('Backend returned zero trades.');
-        alert('No trades were executed for this period. Try increasing the date range or the ticker symbol.');
+        setAlertConfig({
+          open: true,
+          title: 'No Trades Executed',
+          description: 'No trades were executed for this period. Try increasing the date range or the ticker symbol.',
+          variant: 'default'
+        });
       }
     } catch (error: any) {
       console.error('Failed to run backtest:', error);
-      alert(`Error: ${error.message || 'Failed to connect to backend API'}`);
+      setAlertConfig({
+        open: true,
+        title: 'Simulation Error',
+        description: error.message || 'Failed to connect to backend API',
+        variant: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -113,51 +157,86 @@ function App() {
   };
 
   return (
-    <div className="h-screen bg-black text-white flex overflow-hidden">
+    <div className="h-screen bg-black text-white flex overflow-hidden font-sans">
       {/* Sidebar - Parameters */}
-      <aside className="w-80 border-r border-white/10 flex flex-col glass overflow-y-auto flex-shrink-0">
+      <aside className="w-80 border-r border-white/10 flex flex-col glass overflow-y-auto flex-shrink-0 relative z-20">
         <div className="p-6 border-b border-white/10 flex items-center gap-3">
           <div className="bg-primary/20 p-2 rounded-lg">
             <Activity className="text-primary" size={20} />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">QuantNode</h1>
+          <h1 className="text-xl font-bold tracking-tight">Quant Node</h1>
         </div>
 
         <div className="p-6 space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4 font-mono">
             <Settings size={14} />
             Strategy Parameters
           </div>
 
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] text-muted-foreground uppercase font-bold px-1">Ticker Symbol</label>
+              <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">Ticker Symbol</label>
               <input
                 type="text"
                 value={params.symbol}
                 onChange={(e) => updateParam('symbol', e.target.value.toUpperCase())}
-                className="w-full bg-secondary/50 border border-white/5 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary text-sm font-mono mb-2"
+                placeholder="e.g. SOFI"
+                className="w-full bg-secondary/50 border border-white/5 rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary text-sm font-mono mb-2 placeholder:text-muted-foreground/30"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pb-4">
+            <div className="grid grid-cols-1 gap-4 pb-4">
               <div className="space-y-1">
-                <label className="text-[12px] text-muted-foreground uppercase font-bold px-1">Start Date</label>
-                <input
-                  type="date"
-                  value={params.startDate}
-                  onChange={(e) => updateParam('startDate', e.target.value)}
-                  className="w-full bg-secondary/50 border border-white/5 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-primary text-[10px] font-mono"
-                />
+                <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">Start Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-secondary/50 border-white/5 h-10 text-xs font-mono rounded-lg hover:bg-secondary/70 transition-colors",
+                        !params.startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                      {params.startDate ? format(new Date(params.startDate + 'T00:00:00'), "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-black border-white/10" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={new Date(params.startDate + 'T00:00:00')}
+                      onSelect={(date) => date && updateParam('startDate', format(date, "yyyy-MM-dd"))}
+                      captionLayout="dropdown"
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1">
-                <label className="text-[12px] text-muted-foreground uppercase font-bold px-1">End Date</label>
-                <input
-                  type="date"
-                  value={params.endDate}
-                  onChange={(e) => updateParam('endDate', e.target.value)}
-                  className="w-full bg-secondary/50 border border-white/5 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-primary text-[10px] font-mono"
-                />
+                <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">End Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-secondary/50 border-white/5 h-10 text-xs font-mono rounded-lg hover:bg-secondary/70 transition-colors",
+                        !params.endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                      {params.endDate ? format(new Date(params.endDate + 'T00:00:00'), "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-black border-white/10" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={new Date(params.endDate + 'T00:00:00')}
+                      onSelect={(date) => date && updateParam('endDate', format(date, "yyyy-MM-dd"))}
+                      captionLayout="dropdown"
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
@@ -210,7 +289,7 @@ function App() {
           <button
             onClick={runBacktest}
             disabled={loading}
-            className="w-full mt-6 bg-primary text-primary-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(0,255,122,0.2)]"
+            className="w-full mt-6 bg-primary text-primary-foreground font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(0,255,122,0.2)]"
           >
             {loading ? (
               <div className="h-5 w-5 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin rounded-full" />
@@ -225,115 +304,184 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        <header className="flex justify-between items-center mb-10">
-          <div>
-            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1 uppercase tracking-widest font-semibold">
-              <TrendingUp size={16} />
-              Performance Overview
-            </div>
-            <h2 className="text-3xl font-extrabold flex items-center gap-3">
-              {params.symbol} Backtest
-              <span className="text-xs bg-white/5 px-2 py-1 rounded-full border border-white/10 text-muted-foreground font-mono">
-                {params.startDate} to {params.endDate}
-              </span>
-            </h2>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <StatCard
-            label="Total Net Worth"
-            value={`$${results.summary?.finalAccountValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-            icon={<DollarSign size={20} />}
-            trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
-            loading={loading}
-          />
-          <StatCard
-            label="Total Profit"
-            value={`$${results.summary?.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-            icon={<TrendingUp size={20} />}
-            trend={results.summary ? (results.summary.totalProfitRealized > 0) : null}
-            loading={loading}
-          />
-          <StatCard
-            label="Max Drawdown"
-            value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
-            icon={<TrendingDown size={20} />}
-            negative
-            loading={loading}
-          />
-          <StatCard
-            label="Trades Executed"
-            value={results.trades.length.toString()}
-            icon={<Activity size={20} />}
-            loading={loading}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          <StatCard
-            label="Available Cash"
-            value={`$${results.summary?.currentCashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}`}
-            icon={<Wallet size={20} className="text-blue-400" />}
-            loading={loading}
-          />
-          <StatCard
-            label="Unsold Shares"
-            value={results.summary?.unsoldShares.toFixed(2) || '0'}
-            icon={<Briefcase size={20} className="text-orange-400" />}
-            loading={loading}
-          />
-          <StatCard
-            label="Avg Cost Basis"
-            value={`$${results.summary?.averagePriceUnsold.toFixed(2) || '0'}`}
-            icon={<Target size={20} className="text-purple-400" />}
-            loading={loading}
-          />
-          <StatCard
-            label="All-Time High"
-            value={`$${results.summary?.peakValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-            icon={<TrendingUp size={20} className="text-primary" />}
-            loading={loading}
-          />
-          <StatCard
-            label="Peak Growth"
-            value={`${results.summary ? (((results.summary.peakValue / results.summary.initialBalance) - 1) * 100).toFixed(2) : '0'}%`}
-            icon={<Activity size={20} className="text-primary" />}
-            loading={loading}
-          />
-        </div>
-
-        {/* Chart Area */}
-        <div className="p-8 rounded-2xl border border-white/10 glass rh-gradient">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-bold">Equity Curve</h3>
-            <div className="flex gap-4 text-xs">
-              <div className="flex items-center gap-1.5 text-primary">
-                <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_#00ff7a]" />
-                Portfolio Value
+      <main className="flex-1 p-8 overflow-y-auto relative">
+        <div className="max-w-7xl mx-auto h-full flex flex-col">
+          {!results.summary && !loading ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in zoom-in duration-700">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full" />
+                <div className="relative bg-secondary/30 p-8 rounded-3xl border border-white/10 glass">
+                  <LineChart size={64} className="text-primary animate-pulse" />
+                </div>
               </div>
-            </div>
-          </div>
-          {loading ? (
-            <div className="h-[300px] w-full flex flex-col items-center justify-center gap-4">
-              <Skeleton className="h-full w-full" />
-              <div className="absolute flex flex-col items-center gap-3">
-                <div className="h-8 w-8 border-3 border-primary/30 border-t-primary animate-spin rounded-full" />
-                <p className="text-sm font-medium text-primary/80 animate-pulse tracking-wide font-mono">
-                  {loadingMessage}
+
+              <div className="space-y-3 max-w-md">
+                <h2 className="text-4xl font-black tracking-tight">Welcome to Quant Node</h2>
+                <p className="text-muted-foreground text-lg leading-relaxed">
+                  The ultimate grid trading backtester. Configure your strategy parameters on the left and hit <span className="text-primary font-bold">Run Simulation</span> to analyze market behavior.
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl">
+                <FeatureCard
+                  icon={<Zap size={20} className="text-yellow-400" />}
+                  title="Flash Backtesting"
+                  desc="Analyze years of historical data in milliseconds."
+                />
+                <FeatureCard
+                  icon={<BarChart3 size={20} className="text-blue-400" />}
+                  title="Deep Insights"
+                  desc="Track drawdown, equity curves, and profit metrics."
+                />
+                <FeatureCard
+                  icon={<MousePointer2 size={20} className="text-purple-400" />}
+                  title="Interactive UI"
+                  desc="Modify parameters on the fly and see instant updates."
+                />
               </div>
             </div>
           ) : (
-            <BacktestChart data={results.equityHistory} />
+            <>
+              <header className="flex justify-between items-center mb-10">
+                <div className="animate-in slide-in-from-left duration-500">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1 uppercase tracking-widest font-bold">
+                    <TrendingUp size={16} />
+                    Performance Overview
+                  </div>
+                  <h2 className="text-3xl font-black flex items-center gap-3">
+                    {params.symbol} <span className="text-primary">Backtest</span>
+                    <span className="text-sm bg-white/5 px-3 py-1.5 rounded-full border border-white/10 text-muted-foreground font-mono font-medium">
+                      {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} to {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
+                    </span>
+                  </h2>
+                </div>
+              </header>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <StatCard
+                  label="Total Net Worth"
+                  value={`$${results.summary?.finalAccountValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                  icon={<DollarSign size={20} />}
+                  trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
+                  loading={loading}
+                />
+                <StatCard
+                  label="Total Profit"
+                  value={`$${results.summary?.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                  icon={<TrendingUp size={20} />}
+                  trend={results.summary ? (results.summary.totalProfitRealized > 0) : null}
+                  loading={loading}
+                />
+                <StatCard
+                  label="Max Drawdown"
+                  value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
+                  icon={<TrendingDown size={20} />}
+                  negative
+                  loading={loading}
+                />
+                <StatCard
+                  label="Trades Executed"
+                  value={results.trades.length.toString()}
+                  icon={<Activity size={20} />}
+                  loading={loading}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                <StatCard
+                  label="Available Cash"
+                  value={`$${results.summary?.currentCashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}`}
+                  icon={<Wallet size={20} className="text-blue-400" />}
+                  loading={loading}
+                />
+                <StatCard
+                  label="Unsold Shares"
+                  value={results.summary?.unsoldShares.toFixed(2) || '0'}
+                  icon={<Briefcase size={20} className="text-orange-400" />}
+                  loading={loading}
+                />
+                <StatCard
+                  label="Avg Cost Basis"
+                  value={`$${results.summary?.averagePriceUnsold.toFixed(2) || '0'}`}
+                  icon={<Target size={20} className="text-purple-400" />}
+                  loading={loading}
+                />
+                <StatCard
+                  label="All-Time High"
+                  value={`$${results.summary?.peakValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                  icon={<TrendingUp size={20} className="text-primary" />}
+                  loading={loading}
+                />
+                <StatCard
+                  label="Peak Growth"
+                  value={`${results.summary ? (((results.summary.peakValue / results.summary.initialBalance) - 1) * 100).toFixed(2) : '0'}%`}
+                  icon={<Activity size={20} className="text-primary" />}
+                  loading={loading}
+                />
+              </div>
+
+              {/* Chart Area */}
+              <div className="p-8 rounded-3xl border border-white/10 glass rh-gradient mb-8 relative overflow-hidden group min-h-[500px]">
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                <div className="flex items-center justify-between mb-4 relative z-10">
+                  <h3 className="text-xl font-bold tracking-tight">Equity Curve</h3>
+                  <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    <div className="flex items-center gap-2 text-primary">
+                      <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
+                      Portfolio Value
+                    </div>
+                  </div>
+                </div>
+                <div className="h-full w-full relative min-h-[400px]">
+                  {loading ? (
+                    <div className="h-full w-full flex flex-col items-center justify-center gap-6">
+                      <Skeleton className="h-full w-full rounded-2xl" />
+                      <div className="absolute flex flex-col items-center gap-4 bg-black/40 backdrop-blur-md p-8 rounded-3xl border border-white/10">
+                        <div className="h-12 w-12 border-4 border-primary/20 border-t-primary animate-spin rounded-full" />
+                        <p className="text-lg font-bold text-primary animate-pulse tracking-widest uppercase font-mono">
+                          {loadingMessage}
+                        </p>
+                      </div>
+                    </div>
+                  ) : results.equityHistory.length > 0 ? (
+                    <BacktestChart data={results.equityHistory} />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-muted-foreground border border-dashed border-white/10 rounded-2xl min-h-[400px]">
+                      No chart data available
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Trade History */}
+              <div className="animate-in slide-in-from-bottom duration-700">
+                <TradeTable trades={results.trades} loading={loading} />
+              </div>
+            </>
           )}
         </div>
-
-        {/* Trade History */}
-        <TradeTable trades={results.trades} loading={loading} />
-
       </main>
+
+      <AlertDialog open={alertConfig.open} onOpenChange={(open) => setAlertConfig(prev => ({ ...prev, open }))}>
+        <AlertDialogContent className="bg-black border-white/10 glass">
+          <AlertDialogHeader>
+            <AlertDialogTitle className={cn(
+              "text-xl font-bold",
+              alertConfig.variant === 'error' ? "text-red-400" : "text-white"
+            )}>
+              {alertConfig.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {alertConfig.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction className="bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity">
+              Understood
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -363,6 +511,20 @@ function StatCard({ label, value, icon, trend, negative, loading }: any) {
       ) : (
         <div className={`text-xl font-black tracking-tight ${negative ? 'text-red-400' : ''}`}>{value}</div>
       )}
+    </div>
+  );
+}
+
+StatCard.displayName = 'StatCard';
+
+function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+  return (
+    <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all group">
+      <div className="mb-4 bg-secondary/50 w-fit p-3 rounded-xl group-hover:scale-110 transition-transform">
+        {icon}
+      </div>
+      <h4 className="font-bold text-lg mb-1">{title}</h4>
+      <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
     </div>
   );
 }

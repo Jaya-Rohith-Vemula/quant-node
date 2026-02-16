@@ -23,43 +23,40 @@ export const BacktestChart: React.FC<BacktestChartProps> = ({ data }) => {
     }
 
     return (
-        <div className="h-[400px] w-full mt-6">
+        <div className="w-full h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data}>
+                <AreaChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                     <defs>
                         <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#00ff7a" stopOpacity={0.3} />
+                            <stop offset="5%" stopColor="#00ff7a" stopOpacity={0.8} />
                             <stop offset="95%" stopColor="#00ff7a" stopOpacity={0} />
                         </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                    <XAxis
-                        dataKey="datetime"
-                        stroke="#666"
-                        fontSize={10}
-                        tickFormatter={(val) => val.split(' ')[0]}
-                        hide
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="datetime" hide />
                     <YAxis
-                        stroke="#666"
-                        fontSize={10}
+                        stroke="#888"
+                        fontSize={12}
                         tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
                         domain={['auto', 'auto']}
+                        axisLine={false}
+                        tickLine={false}
                     />
                     <Tooltip
-                        contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #333', borderRadius: '8px' }}
-                        itemStyle={{ color: '#00ff7a' }}
-                        labelStyle={{ color: '#999' }}
-                        formatter={(value: any) => [`$${parseFloat(value).toLocaleString()}`, 'Account Value']}
+                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', backdropFilter: 'blur(8px)' }}
+                        itemStyle={{ color: '#00ff7a', fontWeight: 'bold' }}
+                        labelStyle={{ color: '#94a3b8' }}
+                        formatter={(value: any) => [`$${parseFloat(value).toLocaleString()}`, 'Portfolio Value']}
                     />
                     <Area
                         type="monotone"
                         dataKey="accountBalance"
                         stroke="#00ff7a"
-                        strokeWidth={2}
+                        strokeWidth={3}
                         fillOpacity={1}
                         fill="url(#colorBalance)"
                         dot={false}
+                        animationDuration={1500}
                     />
                 </AreaChart>
             </ResponsiveContainer>
