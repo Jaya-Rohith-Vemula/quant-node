@@ -221,7 +221,7 @@ function App() {
                     </div>
                     <div className="animate-in slide-in-from-right duration-500 w-full sm:w-auto flex justify-center sm:justify-end">
                       <span className="text-[10px] md:text-sm bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium truncate">
-                        {format(new Date(params.startDate + 'T00:00:00'), "MMM d")} - {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
+                        {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} - {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
                       </span>
                     </div>
                   </header>
