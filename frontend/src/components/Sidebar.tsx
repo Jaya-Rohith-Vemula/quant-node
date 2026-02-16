@@ -3,7 +3,8 @@ import {
     Settings,
     Calendar as CalendarIcon,
     Play,
-    LineChart
+    LineChart,
+    X
 } from 'lucide-react';
 import { ModeToggle } from './ModeToggle';
 import { format } from "date-fns";
@@ -23,14 +24,19 @@ interface SidebarProps {
     loading: boolean;
     onParamChange: (key: string, value: any) => void;
     onRunBacktest: () => void;
+    mobileOpen?: boolean;
+    setMobileOpen?: (open: boolean) => void;
 }
 
-export function Sidebar({ params, loading, onParamChange, onRunBacktest }: SidebarProps) {
+export function Sidebar({ params, loading, onParamChange, onRunBacktest, mobileOpen, setMobileOpen }: SidebarProps) {
     const [startDateOpen, setStartDateOpen] = useState(false);
     const [endDateOpen, setEndDateOpen] = useState(false);
 
     return (
-        <aside className="w-80 border-r border-border flex flex-col glass overflow-y-auto flex-shrink-0 relative z-20">
+        <aside className={cn(
+            "fixed inset-y-0 left-0 z-50 w-80 lg:relative lg:flex lg:z-20 border-r border-border flex-col bg-background lg:bg-transparent lg:glass overflow-y-auto flex-shrink-0 transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none",
+            mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}>
             <div className="p-6 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="bg-primary/20 p-2 rounded-lg">
@@ -38,7 +44,17 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                     </div>
                     <h1 className="text-xl font-bold tracking-tight text-foreground">Quant Node</h1>
                 </div>
-                <ModeToggle />
+                <div className="flex items-center gap-2">
+                    <ModeToggle />
+                    {setMobileOpen && (
+                        <button
+                            onClick={() => setMobileOpen(false)}
+                            className="lg:hidden p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground"
+                        >
+                            <X size={20} />
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="p-6 space-y-2">
