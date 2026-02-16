@@ -13,7 +13,6 @@ interface Position {
 
 export interface StrategyParams {
     initialBalance: number;
-    initialDropPercent: number;
     moveDownPercent: number;
     moveUpPercent: number;
     amountToBuy: number;
@@ -42,7 +41,6 @@ export async function runBacktest(params: StrategyParams) {
 
     const {
         initialBalance,
-        initialDropPercent,
         moveDownPercent,
         moveUpPercent,
         amountToBuy,
@@ -51,7 +49,6 @@ export async function runBacktest(params: StrategyParams) {
         symbol
     } = params;
 
-    const initialDropDecimal = initialDropPercent / 100;
     const moveDownDecimal = moveDownPercent / 100;
     const moveUpDecimal = moveUpPercent / 100;
 
@@ -218,9 +215,9 @@ export async function runBacktest(params: StrategyParams) {
 
         if (!hasTraded) {
             const sevenDayHigh = get7DayHigh(rowDate);
-            if (sevenDayHigh > 0 && currentPrice <= sevenDayHigh * (1 - initialDropDecimal)) {
+            if (sevenDayHigh > 0 && currentPrice <= sevenDayHigh * (1 - moveDownDecimal)) {
                 shouldBuy = true;
-                buyReason = `Initial entry: drop of ${initialDropPercent}% from 7-day high (${sevenDayHigh.toFixed(2)})`;
+                buyReason = `Initial entry: drop of ${moveDownPercent}% from 7-day high (${sevenDayHigh.toFixed(2)})`;
             }
         } else {
             if (currentPrice <= referencePrice * (1 - moveDownDecimal)) {

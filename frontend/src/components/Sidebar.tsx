@@ -137,14 +137,6 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest }: Sideb
                     onChange={(v) => onParamChange('initialBalance', v)}
                 />
                 <ParameterSlider
-                    label="Initial Drop"
-                    value={params.initialDropPercent}
-                    min={1}
-                    max={50}
-                    unit="%"
-                    onChange={(v) => onParamChange('initialDropPercent', v)}
-                />
-                <ParameterSlider
                     label="Grid Step (Down)"
                     value={params.moveDownPercent}
                     min={0.5}

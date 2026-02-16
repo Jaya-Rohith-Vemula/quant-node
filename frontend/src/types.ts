@@ -16,7 +16,6 @@ export interface BacktestSummary {
 export interface BacktestParams {
     symbol: string;
     initialBalance: number;
-    initialDropPercent: number;
     moveDownPercent: number;
     moveUpPercent: number;
     amountToBuy: number;

@@ -71,7 +71,6 @@ function App() {
   const [params, setParams] = useState<BacktestParams>({
     symbol: 'SOFI',
     initialBalance: 10000,
-    initialDropPercent: 5,
     moveDownPercent: 2,
     moveUpPercent: 5,
     amountToBuy: 1000,

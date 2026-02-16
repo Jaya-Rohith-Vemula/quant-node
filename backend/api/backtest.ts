@@ -10,7 +10,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`[${new Date().toISOString()}] Incoming backtest request:`, req.body);
         const params: StrategyParams = {
             initialBalance: parseFloat(req.body.initialBalance || '10000'),
-            initialDropPercent: parseFloat(req.body.initialDropPercent || '5'),
             moveDownPercent: parseFloat(req.body.moveDownPercent || '2'),
             moveUpPercent: parseFloat(req.body.moveUpPercent || '5'),
             amountToBuy: parseFloat(req.body.amountToBuy || '1000'),
