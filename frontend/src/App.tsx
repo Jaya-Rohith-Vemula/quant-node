@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   TrendingUp,
   Settings,
@@ -32,6 +32,31 @@ interface BacktestSummary {
 
 function App() {
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Cooking the required details...');
+
+  const loadingMessages = [
+    "Cooking the required details...",
+    "Performing the calculations...",
+    "Hacking the mainframe for alpha...",
+    "Summoning the profit demons...",
+    "Grinding through years of data...",
+    "Consulting the oracle...",
+    "Optimizing for moon mission...",
+    "Distilling market noise into gold...",
+    "Calculating the perfect entry..."
+  ];
+
+  useEffect(() => {
+    let interval: any;
+    if (loading) {
+      let index = 0;
+      interval = setInterval(() => {
+        index = (index + 1) % loadingMessages.length;
+        setLoadingMessage(loadingMessages[index]);
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
   const [params, setParams] = useState({
     symbol: 'SOFI',
     initialBalance: 10000,
@@ -88,9 +113,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex">
+    <div className="h-screen bg-black text-white flex overflow-hidden">
       {/* Sidebar - Parameters */}
-      <aside className="w-80 border-r border-white/10 flex flex-col glass overflow-y-auto">
+      <aside className="w-80 border-r border-white/10 flex flex-col glass overflow-y-auto flex-shrink-0">
         <div className="p-6 border-b border-white/10 flex items-center gap-3">
           <div className="bg-primary/20 p-2 rounded-lg">
             <Activity className="text-primary" size={20} />
@@ -309,7 +334,15 @@ function App() {
             </div>
           </div>
           {loading ? (
-            <Skeleton className="h-[300px] w-full" />
+            <div className="h-[300px] w-full flex flex-col items-center justify-center gap-4">
+              <Skeleton className="h-full w-full" />
+              <div className="absolute flex flex-col items-center gap-3">
+                <div className="h-8 w-8 border-3 border-primary/30 border-t-primary animate-spin rounded-full" />
+                <p className="text-sm font-medium text-primary/80 animate-pulse tracking-wide font-mono">
+                  {loadingMessage}
+                </p>
+              </div>
+            </div>
           ) : (
             <BacktestChart data={results.equityHistory} />
           )}
