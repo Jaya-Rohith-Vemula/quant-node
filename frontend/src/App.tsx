@@ -142,7 +142,7 @@ function App() {
 
             <div className="grid grid-cols-2 gap-2 pb-4">
               <div className="space-y-1">
-                <label className="text-[10px] text-muted-foreground uppercase font-bold px-1">Start Date</label>
+                <label className="text-[12px] text-muted-foreground uppercase font-bold px-1">Start Date</label>
                 <input
                   type="date"
                   value={params.startDate}
@@ -151,7 +151,7 @@ function App() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-muted-foreground uppercase font-bold px-1">End Date</label>
+                <label className="text-[12px] text-muted-foreground uppercase font-bold px-1">End Date</label>
                 <input
                   type="date"
                   value={params.endDate}
@@ -239,24 +239,6 @@ function App() {
               </span>
             </h2>
           </div>
-
-          {(results.summary || loading) && (
-            <div className="flex gap-4">
-              <div className="text-right">
-                <span className="text-xs text-muted-foreground block uppercase font-bold tracking-tighter">Total Return</span>
-                {loading ? (
-                  <Skeleton className="h-8 w-32 mt-1 ml-auto" />
-                ) : (
-                  results.summary && (
-                    <span className={`text-2xl font-black ${results.summary.totalProfitRealized >= 0 ? 'text-primary' : 'text-red-400'}`}>
-                      {results.summary.totalProfitRealized >= 0 ? '+' : ''}
-                      ${results.summary.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  )
-                )}
-              </div>
-            </div>
-          )}
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
@@ -358,26 +340,28 @@ function App() {
 
 function StatCard({ label, value, icon, trend, negative, loading }: any) {
   return (
-    <div className="p-6 rounded-2xl border border-white/10 glass hover:border-white/20 transition-all group">
-      <div className="flex justify-between items-start mb-4">
-        <div className="bg-secondary p-2 rounded-xl text-muted-foreground group-hover:text-white transition-colors">
-          {icon}
+    <div className="p-5 rounded-2xl border border-white/10 glass hover:border-white/20 transition-all group">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="bg-secondary p-1.5 rounded-lg text-muted-foreground group-hover:text-white transition-colors">
+            {icon}
+          </div>
+          <div className="text-muted-foreground text-[14px] font-bold uppercase tracking-widest">{label}</div>
         </div>
         {loading ? (
-          <Skeleton className="h-4 w-12 rounded-full" />
+          <Skeleton className="h-4 w-10 rounded-full" />
         ) : (
           trend !== null && trend !== undefined && (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trend ? 'bg-primary/10 text-primary' : 'bg-red-500/10 text-red-400'}`}>
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${trend ? 'bg-primary/10 text-primary' : 'bg-red-500/10 text-red-400'}`}>
               {trend ? 'BULLISH' : 'BEARISH'}
             </span>
           )
         )}
       </div>
-      <div className="text-muted-foreground text-xs font-bold uppercase tracking-widest mb-1">{label}</div>
       {loading ? (
-        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-7 w-24" />
       ) : (
-        <div className={`text-2xl font-black ${negative ? 'text-red-400' : ''}`}>{value}</div>
+        <div className={`text-xl font-black tracking-tight ${negative ? 'text-red-400' : ''}`}>{value}</div>
       )}
     </div>
   );
