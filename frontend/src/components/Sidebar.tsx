@@ -4,7 +4,8 @@ import {
     Calendar as CalendarIcon,
     Play,
     LineChart,
-    X
+    X,
+    RotateCcw
 } from 'lucide-react';
 import { ModeToggle } from './ModeToggle';
 import { format } from "date-fns";
@@ -23,12 +24,14 @@ interface SidebarProps {
     params: BacktestParams;
     loading: boolean;
     onParamChange: (key: string, value: any) => void;
+    onResetParams: () => void;
+    onNavigateHome: () => void;
     onRunBacktest: () => void;
     mobileOpen?: boolean;
     setMobileOpen?: (open: boolean) => void;
 }
 
-export function Sidebar({ params, loading, onParamChange, onRunBacktest, mobileOpen, setMobileOpen }: SidebarProps) {
+export function Sidebar({ params, loading, onParamChange, onResetParams, onNavigateHome, onRunBacktest, mobileOpen, setMobileOpen }: SidebarProps) {
     const [startDateOpen, setStartDateOpen] = useState(false);
     const [endDateOpen, setEndDateOpen] = useState(false);
 
@@ -38,12 +41,15 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest, mobileO
             mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}>
             <div className="p-6 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="bg-primary/20 p-2 rounded-lg">
+                <button
+                    onClick={onNavigateHome}
+                    className="flex items-center gap-3 hover:opacity-80 transition-opacity active:scale-[0.98] group"
+                >
+                    <div className="bg-primary/20 p-2 rounded-lg group-hover:bg-primary/30 transition-colors">
                         <LineChart className="text-primary" size={20} />
                     </div>
                     <h1 className="text-xl font-bold tracking-tight text-foreground">Quant Node</h1>
-                </div>
+                </button>
                 <div className="flex items-center gap-2">
                     <ModeToggle />
                     {setMobileOpen && (
@@ -58,9 +64,19 @@ export function Sidebar({ params, loading, onParamChange, onRunBacktest, mobileO
             </div>
 
             <div className="p-6 space-y-2">
-                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4 font-mono">
-                    <Settings size={14} />
-                    Strategy Parameters
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-widest font-mono">
+                        <Settings size={14} />
+                        Strategy Parameters
+                    </div>
+                    <button
+                        onClick={onResetParams}
+                        className="text-[10px] font-bold uppercase tracking-tighter text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+                        title="Reset to default parameters"
+                    >
+                        <RotateCcw size={12} />
+                        Reset
+                    </button>
                 </div>
 
                 <div className="space-y-4">

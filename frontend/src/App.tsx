@@ -31,6 +31,16 @@ import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/ModeToggle';
 import type { BacktestParams, BacktestResults } from './types';
 
+const DEFAULT_PARAMS: BacktestParams = {
+  symbol: 'SOFI',
+  initialBalance: 10000,
+  moveDownPercent: 2,
+  moveUpPercent: 5,
+  amountToBuy: 1000,
+  startDate: '2025-01-01',
+  endDate: '2025-02-28'
+};
+
 function App() {
   const [loading, setLoading] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -71,15 +81,7 @@ function App() {
     return () => clearInterval(interval);
   }, [loading]);
 
-  const [params, setParams] = useState<BacktestParams>({
-    symbol: 'SOFI',
-    initialBalance: 10000,
-    moveDownPercent: 2,
-    moveUpPercent: 5,
-    amountToBuy: 1000,
-    startDate: '2025-01-01',
-    endDate: '2025-02-28'
-  });
+  const [params, setParams] = useState<BacktestParams>(DEFAULT_PARAMS);
 
   const [results, setResults] = useState<BacktestResults>({
     trades: [],
@@ -136,6 +138,21 @@ function App() {
     setParams(prev => ({ ...prev, [key]: value }));
   };
 
+  const navigateHome = () => {
+    setParams(DEFAULT_PARAMS);
+    setResults({
+      trades: [],
+      equityHistory: [],
+      summary: null
+    });
+    setLastRunParams(null);
+    setMobileSidebarOpen(false);
+  };
+
+  const resetParams = () => {
+    setParams(DEFAULT_PARAMS);
+  };
+
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <div className="h-screen bg-background text-foreground flex overflow-hidden font-sans">
@@ -143,6 +160,8 @@ function App() {
           params={params}
           loading={loading}
           onParamChange={updateParam}
+          onResetParams={resetParams}
+          onNavigateHome={navigateHome}
           onRunBacktest={runBacktest}
           mobileOpen={mobileSidebarOpen}
           setMobileOpen={setMobileSidebarOpen}
@@ -166,10 +185,13 @@ function App() {
               >
                 <Settings size={20} />
               </button>
-              <div className="flex flex-col">
+              <button
+                onClick={navigateHome}
+                className="flex flex-col text-left hover:opacity-80 transition-opacity active:scale-[0.98]"
+              >
                 <h1 className="text-sm font-black tracking-tight uppercase leading-none">Quant Node</h1>
                 <span className="text-[10px] text-primary font-bold tracking-widest uppercase">Simulator</span>
-              </div>
+              </button>
             </div>
             <ModeToggle />
           </header>
