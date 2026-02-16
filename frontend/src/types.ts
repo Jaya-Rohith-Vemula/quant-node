@@ -1,0 +1,31 @@
+export interface BacktestSummary {
+    symbol: string;
+    totalProfitRealized: number;
+    currentCashBalance: number;
+    unsoldShares: number;
+    averagePriceUnsold: number;
+    finalAccountValue: number;
+    maxDrawdownPercent: number;
+    maxDrawdownAmount: number;
+    minEquity: number;
+    minEquityTime: string;
+    peakValue: number;
+    initialBalance: number;
+}
+
+export interface BacktestParams {
+    symbol: string;
+    initialBalance: number;
+    initialDropPercent: number;
+    moveDownPercent: number;
+    moveUpPercent: number;
+    amountToBuy: number;
+    startDate: string;
+    endDate: string;
+}
+
+export interface BacktestResults {
+    trades: any[];
+    equityHistory: any[];
+    summary: BacktestSummary | null;
+}
