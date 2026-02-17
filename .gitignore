@@ -37,3 +37,6 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Scripts
+backend/analyze_db_storage.ts

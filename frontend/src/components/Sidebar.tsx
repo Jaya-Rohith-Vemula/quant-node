@@ -6,7 +6,8 @@ import {
     LineChart,
     X,
     RotateCcw,
-    BookOpen
+    BookOpen,
+    Activity
 } from 'lucide-react';
 import { ModeToggle } from './ModeToggle';
 import { format } from "date-fns";
@@ -36,13 +37,14 @@ interface SidebarProps {
     onNavigateHome: () => void;
     onNavigateToSimulator: () => void;
     onNavigateToGuide: () => void;
+    onNavigateToUpdates: () => void;
     onRunBacktest: () => void;
     mobileOpen?: boolean;
     setMobileOpen?: (open: boolean) => void;
-    activePage: 'simulator' | 'guide';
+    activePage: 'simulator' | 'guide' | 'updates';
 }
 
-export function Sidebar({ params, loading, onParamChange, onResetParams, onNavigateHome, onNavigateToSimulator, onNavigateToGuide, onRunBacktest, mobileOpen, setMobileOpen, activePage }: SidebarProps) {
+export function Sidebar({ params, loading, onParamChange, onResetParams, onNavigateHome, onNavigateToSimulator, onNavigateToGuide, onNavigateToUpdates, onRunBacktest, mobileOpen, setMobileOpen, activePage }: SidebarProps) {
     const [startDateOpen, setStartDateOpen] = useState(false);
     const [endDateOpen, setEndDateOpen] = useState(false);
 
@@ -94,6 +96,16 @@ export function Sidebar({ params, loading, onParamChange, onResetParams, onNavig
                 >
                     <BookOpen size={18} />
                     <span>How it works</span>
+                </button>
+                <button
+                    onClick={onNavigateToUpdates}
+                    className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all active:scale-[0.98] cursor-pointer",
+                        activePage === 'updates' ? "bg-primary/10 text-primary font-bold shadow-[inset_0_0_10px_rgba(var(--primary-rgb),0.1)]" : "text-muted-foreground hover:bg-secondary/50"
+                    )}
+                >
+                    <Activity size={18} />
+                    <span>System Updates</span>
                 </button>
             </div>
 

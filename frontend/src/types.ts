@@ -28,3 +28,13 @@ export interface BacktestResults {
     equityHistory: any[];
     summary: BacktestSummary | null;
 }
+
+export interface ChangelogEntry {
+    id?: number;
+    title: string;
+    description: string;
+    status: 'planned' | 'in-progress' | 'completed';
+    type: 'feature' | 'bugfix' | 'improvement';
+    update_date: string;
+    created_at?: string;
+}

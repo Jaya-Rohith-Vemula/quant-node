@@ -30,6 +30,7 @@ import { Sidebar } from './components/Sidebar';
 import { WelcomeState } from './components/WelcomeState';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/ModeToggle';
+import { Updates } from './pages/Updates';
 import type { BacktestParams, BacktestResults } from './types';
 
 const DEFAULT_PARAMS: BacktestParams = {
@@ -44,7 +45,7 @@ const DEFAULT_PARAMS: BacktestParams = {
 
 function App() {
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'simulator' | 'guide'>('simulator');
+  const [currentPage, setCurrentPage] = useState<'simulator' | 'guide' | 'updates'>('simulator');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Cooking the required details...');
   const [alertConfig, setAlertConfig] = useState<{
@@ -185,6 +186,10 @@ function App() {
             setCurrentPage('guide');
             setMobileSidebarOpen(false);
           }}
+          onNavigateToUpdates={() => {
+            setCurrentPage('updates');
+            setMobileSidebarOpen(false);
+          }}
           onRunBacktest={() => {
             setCurrentPage('simulator');
             runBacktest();
@@ -230,6 +235,8 @@ function App() {
           >
             {currentPage === 'guide' ? (
               <StrategyGuide onBack={() => setCurrentPage('simulator')} />
+            ) : currentPage === 'updates' ? (
+              <Updates onBack={() => setCurrentPage('simulator')} />
             ) : (
               <>
                 {isStale && !loading && !mobileSidebarOpen && (
