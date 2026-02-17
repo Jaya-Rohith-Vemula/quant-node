@@ -3,6 +3,7 @@ import type { Knex } from "knex";
 import oracledb from "oracledb";
 import "dotenv/config";
 import path from "path";
+import fs from "fs";
 
 const dbConfig: any = {
     client: "oracledb",
@@ -32,13 +33,22 @@ export async function getConn() {
 
     console.log("Opening new Oracle connection...");
 
-    // Resolve wallet path: prefer env var, fallback to local Wallet folder if it exists
+    // Resolve wallet path
     let walletPath = process.env.TNS_ADMIN;
-    if (!walletPath) {
-        // Only default to 'Wallet' if the directory actually exists (local dev)
-        walletPath = path.join(process.cwd(), 'Wallet');
-    } else if (!path.isAbsolute(walletPath)) {
-        walletPath = path.join(process.cwd(), walletPath);
+    let useWallet = false;
+
+    if (walletPath) {
+        if (!path.isAbsolute(walletPath)) {
+            walletPath = path.join(process.cwd(), walletPath);
+        }
+        useWallet = fs.existsSync(walletPath);
+    } else {
+        // Local dev fallback: check if Wallet folder exists
+        const localWallet = path.join(process.cwd(), 'Wallet');
+        if (fs.existsSync(localWallet)) {
+            walletPath = localWallet;
+            useWallet = true;
+        }
     }
 
     const connectionConfig: any = {
@@ -47,15 +57,16 @@ export async function getConn() {
         connectString: process.env.DB_CONNECT_STRING!,
     };
 
-    // Only add walletLocation if we actually have a path to one
-    // This allows wallet-less TLS connections for Vercel
-    if (walletPath && (process.env.TNS_ADMIN || walletPath.includes('Wallet'))) {
+    if (useWallet && walletPath) {
         connectionConfig.walletLocation = walletPath;
         connectionConfig.walletPassword = process.env.DB_PASSWORD!;
+        console.log("Using Oracle Wallet at:", walletPath);
+    } else {
+        console.log("Using wallet-less (TLS) connection.");
     }
 
     persistentConn = await oracledb.getConnection(connectionConfig);
-    console.log("Oracle connection established. Wallet usage:", !!connectionConfig.walletLocation);
+    console.log("Oracle connection established.");
     return persistentConn;
 }
 
