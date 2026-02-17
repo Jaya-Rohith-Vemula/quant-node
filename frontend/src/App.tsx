@@ -25,6 +25,7 @@ import {
 } from "./components/ui/alert-dialog";
 import { cn } from "./lib/utils";
 
+import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
 import { StatCard } from './components/StatCard';
 import { Sidebar } from './components/Sidebar';
 import { WelcomeState } from './components/WelcomeState';
@@ -44,8 +45,14 @@ const DEFAULT_PARAMS: BacktestParams = {
 };
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'simulator' | 'guide' | 'updates'>('simulator');
+
+  // Derive currentPage from location
+  const currentPage = location.pathname === '/how-it-works' ? 'guide' :
+    location.pathname === '/updates' ? 'updates' : 'simulator';
+
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Cooking the required details...');
   const [alertConfig, setAlertConfig] = useState<{
@@ -162,7 +169,7 @@ function App() {
     });
     setLastRunParams(null);
     setMobileSidebarOpen(false);
-    setCurrentPage('simulator');
+    navigate('/');
   };
 
   const resetParams = () => {
@@ -179,19 +186,19 @@ function App() {
           onResetParams={resetParams}
           onNavigateHome={navigateHome}
           onNavigateToSimulator={() => {
-            setCurrentPage('simulator');
+            navigate('/');
             setMobileSidebarOpen(false);
           }}
           onNavigateToGuide={() => {
-            setCurrentPage('guide');
+            navigate('/how-it-works');
             setMobileSidebarOpen(false);
           }}
           onNavigateToUpdates={() => {
-            setCurrentPage('updates');
+            navigate('/updates');
             setMobileSidebarOpen(false);
           }}
           onRunBacktest={() => {
-            setCurrentPage('simulator');
+            navigate('/');
             runBacktest();
           }}
           mobileOpen={mobileSidebarOpen}
@@ -233,168 +240,168 @@ function App() {
             ref={mainContentRef}
             className="flex-1 p-4 md:p-8 overflow-y-auto relative w-full"
           >
-            {currentPage === 'guide' ? (
-              <StrategyGuide onBack={() => setCurrentPage('simulator')} />
-            ) : currentPage === 'updates' ? (
-              <Updates onBack={() => setCurrentPage('simulator')} />
-            ) : (
-              <>
-                {isStale && !loading && !mobileSidebarOpen && (
-                  <div className="absolute inset-0 z-30 flex items-center justify-center animate-in fade-in duration-300">
-                    <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px]" />
-                    <div className="relative bg-card/90 border border-primary/50 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm glass mx-4">
-                      <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                        <Activity className="text-primary animate-pulse" size={24} />
+            <Routes>
+              <Route path="/how-it-works" element={<StrategyGuide onBack={() => navigate('/')} />} />
+              <Route path="/updates" element={<Updates onBack={() => navigate('/')} />} />
+              <Route path="/" element={
+                <>
+                  {isStale && !loading && !mobileSidebarOpen && (
+                    <div className="absolute inset-0 z-30 flex items-center justify-center animate-in fade-in duration-300">
+                      <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px]" />
+                      <div className="relative bg-card/90 border border-primary/50 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm glass mx-4">
+                        <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+                          <Activity className="text-primary animate-pulse" size={24} />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold">Settings Modified</h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Your parameters have changed. Run the simulation again to update the results with the new data.
+                          </p>
+                        </div>
+                        <button
+                          onClick={runBacktest}
+                          className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+                        >
+                          <Play size={16} fill="currentColor" />
+                          Update Simulation
+                        </button>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-bold">Settings Modified</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Your parameters have changed. Run the simulation again to update the results with the new data.
-                        </p>
-                      </div>
-                      <button
-                        onClick={runBacktest}
-                        className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
-                      >
-                        <Play size={16} fill="currentColor" />
-                        Update Simulation
-                      </button>
                     </div>
-                  </div>
-                )}
-                <div className={cn(
-                  "max-w-7xl mx-auto h-full flex flex-col transition-all duration-300",
-                  (isStale && !loading) && "opacity-50 blur-[1px] pointer-events-none scale-[0.99]"
-                )}>
-                  {!results.summary && !loading ? (
-                    <WelcomeState
-                      onOpenSidebar={() => setMobileSidebarOpen(true)}
-                      onNavigateToGuide={() => setCurrentPage('guide')}
-                    />
-                  ) : (
-                    <>
-                      <header className="flex flex-col sm:flex-row justify-between items-center sm:items-center gap-2 mb-4 md:mb-6">
-                        <div className="flex flex-col items-center sm:items-start w-full sm:w-auto text-center sm:text-left">
-                          <div className="animate-in slide-in-from-left duration-500">
-                            <div className="flex items-center justify-center sm:justify-start gap-2 text-muted-foreground text-xs mb-1 uppercase tracking-widest font-bold">
-                              <TrendingUp size={14} />
-                              Performance Overview
-                            </div>
-                            <h2 className="text-xl md:text-2xl font-black flex items-center justify-center sm:justify-start gap-2">
-                              {params.symbol} <span >Backtest</span>
-                            </h2>
-                          </div>
-                        </div>
-                        <div className="animate-in slide-in-from-right duration-500 w-full sm:w-auto flex justify-center sm:justify-end">
-                          <span className="text-[10px] md:text-sm bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium truncate">
-                            {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} - {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
-                          </span>
-                        </div>
-                      </header>
-
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                        <StatCard
-                          label="Total Net Worth"
-                          value={`$${results.summary?.finalAccountValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-                          icon={<DollarSign size={20} />}
-                          trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
-                          loading={loading}
-                        />
-                        <StatCard
-                          label="Total Profit"
-                          value={`$${results.summary?.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-                          icon={<TrendingUp size={20} />}
-                          trend={results.summary ? (results.summary.totalProfitRealized > 0) : null}
-                          loading={loading}
-                        />
-                        <StatCard
-                          label="Max Drawdown"
-                          value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
-                          icon={<TrendingDown size={20} />}
-                          loading={loading}
-                        />
-                        <StatCard
-                          label="Trades Executed"
-                          value={(results.trades?.length || 0).toString()}
-                          icon={<Activity size={20} />}
-                          loading={loading}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-                        <StatCard
-                          label="Available Cash"
-                          value={`$${results.summary?.currentCashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}`}
-                          icon={<Wallet size={20} className="text-blue-400" />}
-                          loading={loading}
-                        />
-                        <StatCard
-                          label="Unsold Shares"
-                          value={results.summary?.unsoldShares.toFixed(2) || '0'}
-                          icon={<Briefcase size={20} className="text-orange-400" />}
-                          loading={loading}
-                        />
-                        <StatCard
-                          label="Avg Cost Basis"
-                          value={`$${results.summary?.averagePriceUnsold.toFixed(2) || '0'}`}
-                          icon={<Target size={20} className="text-purple-400" />}
-                          loading={loading}
-                        />
-                        <StatCard
-                          label="All-Time High"
-                          value={`$${results.summary?.peakValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-                          icon={<TrendingUp size={20} className="text-primary" />}
-                          loading={loading}
-                        />
-                        <StatCard
-                          label="Peak Growth"
-                          value={`${results.summary ? (((results.summary.peakValue / results.summary.initialBalance) - 1) * 100).toFixed(2) : '0'}%`}
-                          icon={<Activity size={20} className="text-primary" />}
-                          loading={loading}
-                        />
-                      </div>
-
-                      {/* Chart Area */}
-                      <div className="p-4 md:p-8 rounded-2xl md:rounded-3xl border border-border glass rh-gradient relative overflow-hidden group min-h-[400px] md:min-h-[500px]">
-                        <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                        <div className="flex items-center justify-between mb-4 relative z-10">
-                          <h3 className="text-xl font-bold tracking-tight">Equity Curve</h3>
-                          <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                            <div className="flex items-center gap-2 text-primary">
-                              <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
-                              Portfolio Value
+                  )}
+                  <div className={cn(
+                    "max-w-7xl mx-auto h-full flex flex-col transition-all duration-300",
+                    (isStale && !loading) && "opacity-50 blur-[1px] pointer-events-none scale-[0.99]"
+                  )}>
+                    {!results.summary && !loading ? (
+                      <WelcomeState
+                        onOpenSidebar={() => setMobileSidebarOpen(true)}
+                        onNavigateToGuide={() => navigate('/how-it-works')}
+                      />
+                    ) : (
+                      <>
+                        <header className="flex flex-col sm:flex-row justify-between items-center sm:items-center gap-2 mb-4 md:mb-6">
+                          <div className="flex flex-col items-center sm:items-start w-full sm:w-auto text-center sm:text-left">
+                            <div className="animate-in slide-in-from-left duration-500">
+                              <div className="flex items-center justify-center sm:justify-start gap-2 text-muted-foreground text-xs mb-1 uppercase tracking-widest font-bold">
+                                <TrendingUp size={14} />
+                                Performance Overview
+                              </div>
+                              <h2 className="text-xl md:text-2xl font-black flex items-center justify-center sm:justify-start gap-2">
+                                {params.symbol} <span >Backtest</span>
+                              </h2>
                             </div>
                           </div>
+                          <div className="animate-in slide-in-from-right duration-500 w-full sm:w-auto flex justify-center sm:justify-end">
+                            <span className="text-[10px] md:text-sm bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium truncate">
+                              {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} - {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
+                            </span>
+                          </div>
+                        </header>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                          <StatCard
+                            label="Total Net Worth"
+                            value={`$${results.summary?.finalAccountValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                            icon={<DollarSign size={20} />}
+                            trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
+                            loading={loading}
+                          />
+                          <StatCard
+                            label="Total Profit"
+                            value={`$${results.summary?.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                            icon={<TrendingUp size={20} />}
+                            trend={results.summary ? (results.summary.totalProfitRealized > 0) : null}
+                            loading={loading}
+                          />
+                          <StatCard
+                            label="Max Drawdown"
+                            value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
+                            icon={<TrendingDown size={20} />}
+                            loading={loading}
+                          />
+                          <StatCard
+                            label="Trades Executed"
+                            value={(results.trades?.length || 0).toString()}
+                            icon={<Activity size={20} />}
+                            loading={loading}
+                          />
                         </div>
-                        <div className="h-full w-full relative min-h-[300px] md:min-h-[400px]">
-                          {loading ? (
-                            <div className="h-full w-full flex flex-col items-center justify-center gap-6">
-                              <div className="h-full w-full bg-white/5 animate-pulse rounded-2xl" />
-                              <div className="absolute flex flex-col items-center gap-4 bg-background/40 backdrop-blur-md p-8 rounded-3xl border border-border">
-                                <div className="h-12 w-12 border-4 border-primary/20 border-t-primary animate-spin rounded-full" />
-                                <p className="text-lg font-bold text-primary animate-pulse tracking-widest uppercase font-mono">
-                                  {loadingMessage}
-                                </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                          <StatCard
+                            label="Available Cash"
+                            value={`$${results.summary?.currentCashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}`}
+                            icon={<Wallet size={20} className="text-blue-400" />}
+                            loading={loading}
+                          />
+                          <StatCard
+                            label="Unsold Shares"
+                            value={results.summary?.unsoldShares.toFixed(2) || '0'}
+                            icon={<Briefcase size={20} className="text-orange-400" />}
+                            loading={loading}
+                          />
+                          <StatCard
+                            label="Avg Cost Basis"
+                            value={`$${results.summary?.averagePriceUnsold.toFixed(2) || '0'}`}
+                            icon={<Target size={20} className="text-purple-400" />}
+                            loading={loading}
+                          />
+                          <StatCard
+                            label="All-Time High"
+                            value={`$${results.summary?.peakValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                            icon={<TrendingUp size={20} className="text-primary" />}
+                            loading={loading}
+                          />
+                          <StatCard
+                            label="Peak Growth"
+                            value={`${results.summary ? (((results.summary.peakValue / results.summary.initialBalance) - 1) * 100).toFixed(2) : '0'}%`}
+                            icon={<Activity size={20} className="text-primary" />}
+                            loading={loading}
+                          />
+                        </div>
+
+                        {/* Chart Area */}
+                        <div className="p-4 md:p-8 rounded-2xl md:rounded-3xl border border-border glass rh-gradient relative overflow-hidden group min-h-[400px] md:min-h-[500px]">
+                          <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                          <div className="flex items-center justify-between mb-4 relative z-10">
+                            <h3 className="text-xl font-bold tracking-tight">Equity Curve</h3>
+                            <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                              <div className="flex items-center gap-2 text-primary">
+                                <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
+                                Portfolio Value
                               </div>
                             </div>
-                          ) : (results.equityHistory?.length || 0) > 0 ? (
-                            <BacktestChart data={results.equityHistory} />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-muted-foreground border border-dashed border-border rounded-2xl min-h-[300px] md:min-h-[400px]">
-                              No chart data available
-                            </div>
-                          )}
+                          </div>
+                          <div className="h-full w-full relative min-h-[300px] md:min-h-[400px]">
+                            {loading ? (
+                              <div className="h-full w-full flex flex-col items-center justify-center gap-6">
+                                <div className="h-full w-full bg-white/5 animate-pulse rounded-2xl" />
+                                <div className="absolute flex flex-col items-center gap-4 bg-background/40 backdrop-blur-md p-8 rounded-3xl border border-border">
+                                  <div className="h-12 w-12 border-4 border-primary/20 border-t-primary animate-spin rounded-full" />
+                                  <p className="text-lg font-bold text-primary animate-pulse tracking-widest uppercase font-mono">
+                                    {loadingMessage}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (results.equityHistory?.length || 0) > 0 ? (
+                              <BacktestChart data={results.equityHistory} />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-muted-foreground border border-dashed border-border rounded-2xl min-h-[300px] md:min-h-[400px]">
+                                No chart data available
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      {/* Trade History */}
-                      <div className="animate-in slide-in-from-bottom duration-700 pb-8 mt-6">
-                        <TradeTable trades={results.trades || []} loading={loading} />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
+                        {/* Trade History */}
+                        <div className="animate-in slide-in-from-bottom duration-700 pb-8 mt-6">
+                          <TradeTable trades={results.trades || []} loading={loading} />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              } />
+            </Routes>
           </main>
 
           <AlertDialog open={alertConfig.open} onOpenChange={(open) => setAlertConfig(prev => ({ ...prev, open }))}>

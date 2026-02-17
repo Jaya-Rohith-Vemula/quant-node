@@ -3,6 +3,10 @@
         {
             "source": "/api/:path*",
             "destination": "https://quant-node-backend.vercel.app/api/:path*"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
         }
     ]
 }
