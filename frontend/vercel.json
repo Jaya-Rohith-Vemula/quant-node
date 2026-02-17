@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://YOUR_BACKEND_URL.vercel.app/api/:path*"
+            "destination": "https://quant-node-backend.vercel.app/api/:path*"
         }
     ]
 }
