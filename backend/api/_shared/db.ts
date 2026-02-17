@@ -32,22 +32,30 @@ export async function getConn() {
 
     console.log("Opening new Oracle connection...");
 
-    // Resolve wallet path: prefer env var, fallback to local Wallet folder
+    // Resolve wallet path: prefer env var, fallback to local Wallet folder if it exists
     let walletPath = process.env.TNS_ADMIN;
     if (!walletPath) {
+        // Only default to 'Wallet' if the directory actually exists (local dev)
         walletPath = path.join(process.cwd(), 'Wallet');
     } else if (!path.isAbsolute(walletPath)) {
         walletPath = path.join(process.cwd(), walletPath);
     }
 
-    persistentConn = await oracledb.getConnection({
+    const connectionConfig: any = {
         user: process.env.DB_USER!,
         password: process.env.DB_PASSWORD!,
         connectString: process.env.DB_CONNECT_STRING!,
-        walletLocation: walletPath,
-        walletPassword: process.env.DB_PASSWORD!,
-    });
-    console.log("Oracle connection established with wallet at:", walletPath);
+    };
+
+    // Only add walletLocation if we actually have a path to one
+    // This allows wallet-less TLS connections for Vercel
+    if (walletPath && (process.env.TNS_ADMIN || walletPath.includes('Wallet'))) {
+        connectionConfig.walletLocation = walletPath;
+        connectionConfig.walletPassword = process.env.DB_PASSWORD!;
+    }
+
+    persistentConn = await oracledb.getConnection(connectionConfig);
+    console.log("Oracle connection established. Wallet usage:", !!connectionConfig.walletLocation);
     return persistentConn;
 }
 
