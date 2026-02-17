@@ -81,6 +81,7 @@ export async function runBacktest(params: StrategyParams) {
         console.warn('No data found for the selected symbol and date range.');
         return {
             trades: [],
+            equityHistory: [],
             summary: {
                 symbol,
                 totalProfitRealized: 0,

@@ -18,6 +18,13 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "./ui/popover";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "./ui/select";
 import { cn } from "../lib/utils";
 import type { BacktestParams } from '../types';
 
@@ -109,13 +116,17 @@ export function Sidebar({ params, loading, onParamChange, onResetParams, onNavig
                 <div className="space-y-4">
                     <div className="space-y-1">
                         <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">Ticker Symbol</label>
-                        <input
-                            type="text"
+                        <Select
                             value={params.symbol}
-                            onChange={(e) => onParamChange('symbol', e.target.value.toUpperCase())}
-                            placeholder="e.g. SOFI"
-                            className="w-full bg-secondary/50 border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary text-sm font-mono mb-2 placeholder:text-muted-foreground/30 text-foreground"
-                        />
+                            onValueChange={(val) => onParamChange('symbol', val)}
+                        >
+                            <SelectTrigger className="w-full bg-secondary/50 border border-border h-10 text-sm font-mono mb-2 focus:ring-1 focus:ring-primary text-foreground">
+                                <SelectValue placeholder="Select Symbol" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border">
+                                <SelectItem value="SOFI">SOFI</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 pb-4">

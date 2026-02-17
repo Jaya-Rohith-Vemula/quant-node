@@ -120,9 +120,13 @@ function App() {
         throw new Error(data.error);
       }
 
-      setResults(data);
+      setResults({
+        trades: data.trades || [],
+        equityHistory: data.equityHistory || [],
+        summary: data.summary || null
+      });
       setLastRunParams({ ...params });
-      if (data.trades.length === 0) {
+      if (!data.trades || data.trades.length === 0) {
         console.warn('Backend returned zero trades.');
         setAlertConfig({
           open: true,
@@ -304,7 +308,7 @@ function App() {
                         />
                         <StatCard
                           label="Trades Executed"
-                          value={results.trades.length.toString()}
+                          value={(results.trades?.length || 0).toString()}
                           icon={<Activity size={20} />}
                           loading={loading}
                         />
@@ -366,7 +370,7 @@ function App() {
                                 </p>
                               </div>
                             </div>
-                          ) : results.equityHistory.length > 0 ? (
+                          ) : (results.equityHistory?.length || 0) > 0 ? (
                             <BacktestChart data={results.equityHistory} />
                           ) : (
                             <div className="h-full w-full flex items-center justify-center text-muted-foreground border border-dashed border-border rounded-2xl min-h-[300px] md:min-h-[400px]">
@@ -377,7 +381,7 @@ function App() {
                       </div>
                       {/* Trade History */}
                       <div className="animate-in slide-in-from-bottom duration-700 pb-8 mt-6">
-                        <TradeTable trades={results.trades} loading={loading} />
+                        <TradeTable trades={results.trades || []} loading={loading} />
                       </div>
                     </>
                   )}
