@@ -2,6 +2,7 @@ import knex from "knex";
 import type { Knex } from "knex";
 import oracledb from "oracledb";
 import "dotenv/config";
+import path from "path";
 
 const dbConfig: any = {
     client: "oracledb",
@@ -30,14 +31,23 @@ export async function getConn() {
     }
 
     console.log("Opening new Oracle connection...");
+
+    // Resolve wallet path: prefer env var, fallback to local Wallet folder
+    let walletPath = process.env.TNS_ADMIN;
+    if (!walletPath) {
+        walletPath = path.join(process.cwd(), 'Wallet');
+    } else if (!path.isAbsolute(walletPath)) {
+        walletPath = path.join(process.cwd(), walletPath);
+    }
+
     persistentConn = await oracledb.getConnection({
         user: process.env.DB_USER!,
         password: process.env.DB_PASSWORD!,
         connectString: process.env.DB_CONNECT_STRING!,
-        walletLocation: process.env.TNS_ADMIN!,
+        walletLocation: walletPath,
         walletPassword: process.env.DB_PASSWORD!,
     });
-    console.log("Oracle connection established.");
+    console.log("Oracle connection established with wallet at:", walletPath);
     return persistentConn;
 }
 
