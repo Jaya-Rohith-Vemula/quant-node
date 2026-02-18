@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react';
-import {
-    CheckCircle2,
-    Clock,
-    Hammer,
-    ArrowLeft
-} from 'lucide-react';
+import { ChevronLeft, CheckCircle2, Clock, Hammer } from 'lucide-react';
+import { Button } from '../components/ui/button';
 import { format } from 'date-fns';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -50,16 +46,17 @@ export function Updates({ onBack }: UpdatesProps) {
     const changelog = entries.filter(e => e.status === 'completed');
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in duration-500">
+        <div className="max-w-4xl mx-auto px-4 pb-8 animate-in fade-in duration-500">
             {/* Header */}
             <header className="mb-12">
-                <button
+                <Button
+                    variant="ghost"
                     onClick={onBack}
-                    className="flex items-center gap-2 text-primary font-bold text-sm mb-4 hover:gap-3 transition-all"
+                    className="group -ml-4 text-muted-foreground hover:text-primary transition-colors mb-4 cursor-pointer"
                 >
-                    <ArrowLeft size={16} />
-                    Simulator
-                </button>
+                    <ChevronLeft className="mr-2 group-hover:-translate-x-1 transition-transform " size={20} />
+                    Back to Simulator
+                </Button>
                 <h1 className="text-4xl font-black tracking-tight">System Updates</h1>
                 <p className="text-muted-foreground mt-2">Tracking the evolution of Quant Node.</p>
             </header>

@@ -1,13 +1,5 @@
 import { useState } from 'react';
-import {
-    MessageSquare,
-    Zap,
-    Search,
-    ArrowLeft,
-    Send,
-    CheckCircle2,
-    Loader2
-} from 'lucide-react';
+import { ChevronLeft, MessageSquare, Zap, Search, Send, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { cn } from '../lib/utils';
@@ -56,16 +48,17 @@ export function Feedback({ onBack }: FeedbackProps) {
     };
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in duration-500">
+        <div className="max-w-4xl mx-auto px-4 pb-8 animate-in fade-in duration-500">
             {/* Header */}
             <header className="mb-12">
-                <button
+                <Button
+                    variant="ghost"
                     onClick={onBack}
-                    className="flex items-center gap-2 text-primary font-bold text-sm mb-4 hover:gap-3 transition-all group"
+                    className="group -ml-4 text-muted-foreground hover:text-primary transition-colors mb-4 cursor-pointer"
                 >
-                    <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                    <ChevronLeft className="mr-2 group-hover:-translate-x-1 transition-transform " size={20} />
                     Back to Simulator
-                </button>
+                </Button>
                 <h1 className="text-4xl font-black tracking-tight">Community Feedback</h1>
                 <p className="text-muted-foreground mt-2 text-lg">Help us shape the future of Quant Node. Your input is invaluable.</p>
             </header>

@@ -5,7 +5,7 @@ import {
     Trash2,
     Clock,
     Hammer,
-    ArrowLeft,
+    ChevronLeft,
     ShieldCheck,
     Lock,
     X,
@@ -251,64 +251,68 @@ export function Admin({ onBack }: AdminProps) {
     }
 
     return (
-        <div className="max-w-6xl mx-auto px-4 py-8 animate-in fade-in duration-500">
+        <div className="max-w-6xl mx-auto px-4 pb-8 animate-in fade-in duration-500">
             {/* Header */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
-                <div>
-                    <div className="flex gap-4 mb-4">
-                        <button
-                            onClick={onBack}
-                            className="flex items-center gap-2 text-primary font-bold text-sm hover:gap-3 transition-all"
-                        >
-                            <ArrowLeft size={16} />
-                            Simulator
-                        </button>
-                        <button
-                            onClick={() => {
-                                localStorage.removeItem('admin_key');
-                                window.location.reload();
-                            }}
-                            className="flex items-center gap-2 text-muted-foreground hover:text-red-500 font-bold text-sm transition-all"
-                        >
-                            <Lock size={14} />
-                            Logout
-                        </button>
-                    </div>
-                    <div>
+            <header className="mb-12 space-y-8">
+                <div className="flex justify-between items-center">
+                    <Button
+                        variant="ghost"
+                        onClick={onBack}
+                        className="group -ml-4 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                    >
+                        <ChevronLeft className="mr-2 group-hover:-translate-x-1 transition-transform " size={20} />
+                        Back to Simulator
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            localStorage.removeItem('admin_key');
+                            window.location.reload();
+                        }}
+                        className="text-muted-foreground hover:text-red-500 font-bold text-sm transition-all cursor-pointer group"
+                    >
+                        <Lock size={14} className="mr-2 group-hover:scale-110 transition-transform" />
+                        Logout
+                    </Button>
+                </div>
+
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
+                    <div className="flex-1">
                         <h1 className="text-4xl font-black tracking-tight flex items-center gap-3">
                             <ShieldCheck className="text-primary" size={32} />
                             Admin Command Center
                         </h1>
                         <p className="text-muted-foreground mt-2">Managing Quant Node operations and community feedback.</p>
                     </div>
-                </div>
 
-                {error && (
-                    <div className="mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold flex items-center gap-2 animate-in slide-in-from-top-2">
-                        <AlertCircle size={18} />
-                        {error}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
+                        {error && (
+                            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold flex items-center gap-2 animate-in slide-in-from-top-2">
+                                <AlertCircle size={18} />
+                                {error}
+                            </div>
+                        )}
+                        <div className="flex bg-secondary/50 p-1 rounded-xl border border-white/5">
+                            <button
+                                onClick={() => setActiveTab('updates')}
+                                className={cn(
+                                    "px-6 py-2 rounded-lg text-sm font-bold transition-all",
+                                    activeTab === 'updates' ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                System Updates
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('feedback')}
+                                className={cn(
+                                    "px-6 py-2 rounded-lg text-sm font-bold transition-all",
+                                    activeTab === 'feedback' ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                User Feedback {(feedback.length > 0) && <span className="ml-1 opacity-70">({feedback.length})</span>}
+                            </button>
+                        </div>
                     </div>
-                )}
-
-                <div className="flex bg-secondary/50 p-1 rounded-xl border border-white/5">
-                    <button
-                        onClick={() => setActiveTab('updates')}
-                        className={cn(
-                            "px-6 py-2 rounded-lg text-sm font-bold transition-all",
-                            activeTab === 'updates' ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        System Updates
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('feedback')}
-                        className={cn(
-                            "px-6 py-2 rounded-lg text-sm font-bold transition-all",
-                            activeTab === 'feedback' ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        User Feedback {(feedback.length > 0) && <span className="ml-1 opacity-70">({feedback.length})</span>}
-                    </button>
                 </div>
             </header>
 

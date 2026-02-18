@@ -33,6 +33,7 @@ import {
 import { cn } from "./lib/utils";
 
 import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
+import { Analytics } from "@vercel/analytics/react"
 import { StatCard } from './components/StatCard';
 import { Sidebar } from './components/Sidebar';
 import { WelcomeState } from './components/WelcomeState';
@@ -473,6 +474,7 @@ function App() {
           </AlertDialog>
         </div>
       </div>
+      <Analytics />
     </ThemeProvider>
   );
 }
