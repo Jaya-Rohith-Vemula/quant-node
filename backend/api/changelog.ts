@@ -31,9 +31,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method === 'GET') {
             const data = await db
                 .select('*')
-                .from('changelog')
+                .from('CHANGELOG')
                 .connection(conn)
-                .orderBy('update_date', 'desc');
+                .orderBy('UPDATE_DATE', 'desc');
             return res.status(200).json(data);
         }
 
@@ -45,27 +45,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             if (id) {
                 // Update
-                await db('changelog')
+                await db('CHANGELOG')
                     .connection(conn)
-                    .where('id', id)
+                    .where('ID', id)
                     .update({
-                        title,
-                        description,
-                        status,
-                        type,
-                        update_date: update_date ? new Date(update_date) : new Date()
+                        TITLE: title,
+                        DESCRIPTION: description,
+                        STATUS: status,
+                        TYPE: type,
+                        UPDATE_DATE: update_date ? new Date(update_date) : new Date()
                     });
                 return res.status(200).json({ message: 'Updated successfully' });
             } else {
                 // Insert
-                await db('changelog')
+                await db('CHANGELOG')
                     .connection(conn)
                     .insert({
-                        title,
-                        description,
-                        status,
-                        type,
-                        update_date: update_date ? new Date(update_date) : new Date()
+                        TITLE: title,
+                        DESCRIPTION: description,
+                        STATUS: status,
+                        TYPE: type,
+                        UPDATE_DATE: update_date ? new Date(update_date) : new Date()
                     });
                 return res.status(201).json({ message: 'Created successfully' });
             }
@@ -78,9 +78,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { id } = req.query;
             if (!id) return res.status(400).json({ error: 'ID required' });
 
-            await db('changelog')
+            await db('CHANGELOG')
                 .connection(conn)
-                .where('id', id)
+                .where('ID', id)
                 .delete();
             return res.status(200).json({ message: 'Deleted successfully' });
         }

@@ -7,7 +7,9 @@ import {
     X,
     RotateCcw,
     BookOpen,
-    Activity
+    Activity,
+    MessageSquare,
+    ShieldCheck
 } from 'lucide-react';
 import { ModeToggle } from './ModeToggle';
 import { format } from "date-fns";
@@ -38,13 +40,15 @@ interface SidebarProps {
     onNavigateToSimulator: () => void;
     onNavigateToGuide: () => void;
     onNavigateToUpdates: () => void;
+    onNavigateToFeedback: () => void;
+    onNavigateToAdmin: () => void;
     onRunBacktest: () => void;
     mobileOpen?: boolean;
     setMobileOpen?: (open: boolean) => void;
-    activePage: 'simulator' | 'guide' | 'updates';
+    activePage: 'simulator' | 'guide' | 'updates' | 'feedback' | 'admin';
 }
 
-export function Sidebar({ params, loading, onParamChange, onResetParams, onNavigateHome, onNavigateToSimulator, onNavigateToGuide, onNavigateToUpdates, onRunBacktest, mobileOpen, setMobileOpen, activePage }: SidebarProps) {
+export function Sidebar({ params, loading, onParamChange, onResetParams, onNavigateHome, onNavigateToSimulator, onNavigateToGuide, onNavigateToUpdates, onNavigateToFeedback, onNavigateToAdmin, onRunBacktest, mobileOpen, setMobileOpen, activePage }: SidebarProps) {
     const [startDateOpen, setStartDateOpen] = useState(false);
     const [endDateOpen, setEndDateOpen] = useState(false);
 
@@ -106,6 +110,26 @@ export function Sidebar({ params, loading, onParamChange, onResetParams, onNavig
                 >
                     <Activity size={18} />
                     <span>System Updates</span>
+                </button>
+                <button
+                    onClick={onNavigateToFeedback}
+                    className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all active:scale-[0.98] cursor-pointer",
+                        activePage === 'feedback' ? "bg-primary/10 text-primary font-bold shadow-[inset_0_0_10px_rgba(var(--primary-rgb),0.1)]" : "text-muted-foreground hover:bg-secondary/50"
+                    )}
+                >
+                    <MessageSquare size={18} />
+                    <span>Feedback</span>
+                </button>
+                <button
+                    onClick={onNavigateToAdmin}
+                    className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all active:scale-[0.98] cursor-pointer",
+                        activePage === 'admin' ? "bg-primary/10 text-primary font-bold shadow-[inset_0_0_10px_rgba(var(--primary-rgb),0.1)]" : "text-muted-foreground hover:bg-secondary/50"
+                    )}
+                >
+                    <ShieldCheck size={18} />
+                    <span>Admin</span>
                 </button>
             </div>
 

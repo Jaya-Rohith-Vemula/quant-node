@@ -32,6 +32,8 @@ import { WelcomeState } from './components/WelcomeState';
 import { ThemeProvider } from './components/theme-provider';
 import { ModeToggle } from './components/ModeToggle';
 import { Updates } from './pages/Updates';
+import { Feedback } from './pages/Feedback';
+import { Admin } from './pages/Admin';
 import type { BacktestParams, BacktestResults } from './types';
 
 const DEFAULT_PARAMS: BacktestParams = {
@@ -51,7 +53,9 @@ function App() {
 
   // Derive currentPage from location
   const currentPage = location.pathname === '/how-it-works' ? 'guide' :
-    location.pathname === '/updates' ? 'updates' : 'simulator';
+    location.pathname === '/updates' ? 'updates' :
+      location.pathname === '/feedback' ? 'feedback' :
+        location.pathname === '/admin' ? 'admin' : 'simulator';
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Cooking the required details...');
@@ -197,6 +201,14 @@ function App() {
             navigate('/updates');
             setMobileSidebarOpen(false);
           }}
+          onNavigateToFeedback={() => {
+            navigate('/feedback');
+            setMobileSidebarOpen(false);
+          }}
+          onNavigateToAdmin={() => {
+            navigate('/admin');
+            setMobileSidebarOpen(false);
+          }}
           onRunBacktest={() => {
             navigate('/');
             runBacktest();
@@ -243,6 +255,8 @@ function App() {
             <Routes>
               <Route path="/how-it-works" element={<StrategyGuide onBack={() => navigate('/')} />} />
               <Route path="/updates" element={<Updates onBack={() => navigate('/')} />} />
+              <Route path="/feedback" element={<Feedback onBack={() => navigate('/')} />} />
+              <Route path="/admin" element={<Admin onBack={() => navigate('/')} />} />
               <Route path="/" element={
                 <>
                   {isStale && !loading && !mobileSidebarOpen && (
