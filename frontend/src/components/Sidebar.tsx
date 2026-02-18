@@ -101,7 +101,7 @@ export function Sidebar({ params, loading, availableSymbols = [], symbolsLoading
                                 {symbolsLoading ? (
                                     <div className="flex items-center gap-2">
                                         <div className="h-3 w-3 border-2 border-primary/30 border-t-primary animate-spin rounded-full" />
-                                        <span className="text-muted-foreground">Fetching available symbolsLoading...</span>
+                                        <span className="text-muted-foreground">Loading symbols...</span>
                                     </div>
                                 ) : (
                                     <SelectValue placeholder="Select Symbol" />
