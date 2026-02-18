@@ -1,5 +1,6 @@
 import { LineChart, Settings, Zap, BarChart3, MousePointer2, BookOpen } from 'lucide-react';
 import { FeatureCard } from './FeatureCard';
+import { GithubIcon, XIcon, LinkedinIcon } from './SocialIcons';
 
 interface WelcomeStateProps {
     onOpenSidebar: () => void;
@@ -56,6 +57,39 @@ export function WelcomeState({ onOpenSidebar, onNavigateToGuide }: WelcomeStateP
                     title="Interactive UI"
                     desc="Modify parameters on the fly and see instant updates."
                 />
+            </div>
+
+            <div className="pt-8 border-t border-border/50 w-full max-w-sm flex flex-col items-center gap-4">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/60">Connect with the Developer</span>
+                <div className="flex items-center gap-6">
+                    <a
+                        href="https://github.com/Jaya-Rohith-Vemula/quant-node"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-3 rounded-2xl bg-secondary/30 border border-border/50 text-muted-foreground hover:text-primary hover:border-primary/50 transition-all hover:-translate-y-1 active:scale-95 group shadow-sm"
+                        title="GitHub Repository"
+                    >
+                        <GithubIcon size={20} className="group-hover:scale-110 transition-transform" />
+                    </a>
+                    <a
+                        href="https://x.com/Rohith_Vemula99"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-3 rounded-2xl bg-secondary/30 border border-border/50 text-muted-foreground hover:text-primary hover:border-primary/50 transition-all hover:-translate-y-1 active:scale-95 group shadow-sm"
+                        title="X (Twitter) Profile"
+                    >
+                        <XIcon size={20} className="group-hover:scale-110 transition-transform" />
+                    </a>
+                    <a
+                        href="https://www.linkedin.com/in/rohithvemula/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-3 rounded-2xl bg-secondary/30 border border-border/50 text-muted-foreground hover:text-primary hover:border-primary/50 transition-all hover:-translate-y-1 active:scale-95 group shadow-sm"
+                        title="LinkedIn Profile"
+                    >
+                        <LinkedinIcon size={20} className="group-hover:scale-110 transition-transform" />
+                    </a>
+                </div>
             </div>
         </div>
     );

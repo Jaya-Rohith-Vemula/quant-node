@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   LineChart
 } from 'lucide-react';
+import { GithubIcon, XIcon, LinkedinIcon } from './components/SocialIcons';
 import { format } from "date-fns";
 import { BacktestChart } from './components/BacktestChart';
 import { TradeTable } from './components/TradeTable';
@@ -250,6 +251,38 @@ function App() {
                 <span>{item.label}</span>
               </button>
             ))}
+          </div>
+
+          <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-border/50 bg-secondary/10 backdrop-blur-md">
+            <div className="flex items-center justify-center gap-8">
+              <a
+                href="https://github.com/Jaya-Rohith-Vemula/quant-node"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-primary transition-colors active:scale-95"
+                title="GitHub"
+              >
+                <GithubIcon size={20} />
+              </a>
+              <a
+                href="https://x.com/Rohith_Vemula99"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-primary transition-colors active:scale-95"
+                title="X"
+              >
+                <XIcon size={20} />
+              </a>
+              <a
+                href="https://www.linkedin.com/in/rohithvemula/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-primary transition-colors active:scale-95"
+                title="LinkedIn"
+              >
+                <LinkedinIcon size={20} />
+              </a>
+            </div>
           </div>
         </div>
 

@@ -6,6 +6,7 @@ import {
     MessageSquare,
     ShieldCheck
 } from 'lucide-react';
+import { GithubIcon, XIcon, LinkedinIcon } from './SocialIcons';
 import { cn } from "../lib/utils";
 import { ModeToggle } from './ModeToggle';
 
@@ -54,7 +55,35 @@ export function Navbar({ activePage }: NavbarProps) {
             </div>
 
             <div className="flex items-center gap-4">
-                <div className="h-6 w-px bg-border mx-2" />
+                <div className="flex items-center gap-1 border-r border-border pr-2 mr-2">
+                    <a
+                        href="https://github.com/Jaya-Rohith-Vemula/quant-node"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all active:scale-90"
+                        title="GitHub Repository"
+                    >
+                        <GithubIcon size={18} />
+                    </a>
+                    <a
+                        href="https://x.com/Rohith_Vemula99"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all active:scale-90"
+                        title="X (Twitter) Profile"
+                    >
+                        <XIcon size={18} />
+                    </a>
+                    <a
+                        href="https://www.linkedin.com/in/rohithvemula/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all active:scale-90"
+                        title="LinkedIn Profile"
+                    >
+                        <LinkedinIcon size={18} />
+                    </a>
+                </div>
                 <ModeToggle />
             </div>
         </nav>
