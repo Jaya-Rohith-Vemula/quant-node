@@ -58,6 +58,8 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
+  const [symbolsLoading, setSymbolsLoading] = useState(true);
+  const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
 
   // Derive currentPage from location
   const currentPage = location.pathname === '/how-it-works' ? 'guide' :
@@ -111,6 +113,28 @@ function App() {
     }
     return () => clearInterval(interval);
   }, [loading]);
+
+  useEffect(() => {
+    const fetchSymbols = async () => {
+      setSymbolsLoading(true);
+      try {
+        const response = await fetch('/api/symbols');
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setAvailableSymbols(data);
+          // If current symbol is not in the new list, set it to the first one
+          if (!data.includes(params.symbol)) {
+            setParams(prev => ({ ...prev, symbol: data[0] }));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch symbols:', error);
+      } finally {
+        setSymbolsLoading(false);
+      }
+    };
+    fetchSymbols();
+  }, []);
 
   const [params, setParams] = useState<BacktestParams>(DEFAULT_PARAMS);
 
@@ -195,6 +219,8 @@ function App() {
         <Sidebar
           params={params}
           loading={loading}
+          symbolsLoading={symbolsLoading}
+          availableSymbols={availableSymbols}
           onParamChange={updateParam}
           onResetParams={resetParams}
           onNavigateHome={navigateHome}

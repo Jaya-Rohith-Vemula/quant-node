@@ -34,11 +34,13 @@ interface SidebarProps {
     onResetParams: () => void;
     onNavigateHome: () => void;
     onRunBacktest: () => void;
+    availableSymbols?: string[];
+    symbolsLoading?: boolean;
     mobileOpen?: boolean;
     setMobileOpen?: (open: boolean) => void;
 }
 
-export function Sidebar({ params, loading, onParamChange, onResetParams, onNavigateHome, onRunBacktest, mobileOpen, setMobileOpen }: SidebarProps) {
+export function Sidebar({ params, loading, availableSymbols = [], symbolsLoading = false, onParamChange, onResetParams, onNavigateHome, onRunBacktest, mobileOpen, setMobileOpen }: SidebarProps) {
     const [startDateOpen, setStartDateOpen] = useState(false);
     const [endDateOpen, setEndDateOpen] = useState(false);
 
@@ -93,12 +95,24 @@ export function Sidebar({ params, loading, onParamChange, onResetParams, onNavig
                         <Select
                             value={params.symbol}
                             onValueChange={(val) => onParamChange('symbol', val)}
+                            disabled={symbolsLoading}
                         >
                             <SelectTrigger className="w-full bg-secondary/50 border border-border h-10 text-sm font-mono mb-2 focus:ring-1 focus:ring-primary text-foreground">
-                                <SelectValue placeholder="Select Symbol" />
+                                {symbolsLoading ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-3 w-3 border-2 border-primary/30 border-t-primary animate-spin rounded-full" />
+                                        <span className="text-muted-foreground">Fetching available symbolsLoading...</span>
+                                    </div>
+                                ) : (
+                                    <SelectValue placeholder="Select Symbol" />
+                                )}
                             </SelectTrigger>
                             <SelectContent className="bg-popover border-border">
-                                <SelectItem value="SOFI">SOFI</SelectItem>
+                                {availableSymbols.map((symbol) => (
+                                    <SelectItem key={symbol} value={symbol}>
+                                        {symbol}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
