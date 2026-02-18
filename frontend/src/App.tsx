@@ -8,12 +8,19 @@ import {
   Wallet,
   Activity,
   Play,
-  Settings
+  Settings,
+  Menu,
+  X as CloseIcon,
+  BookOpen,
+  MessageSquare,
+  ShieldCheck,
+  LineChart
 } from 'lucide-react';
 import { format } from "date-fns";
 import { BacktestChart } from './components/BacktestChart';
 import { TradeTable } from './components/TradeTable';
 import { StrategyGuide } from './components/StrategyGuide';
+import { Navbar } from './components/Navbar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +37,6 @@ import { StatCard } from './components/StatCard';
 import { Sidebar } from './components/Sidebar';
 import { WelcomeState } from './components/WelcomeState';
 import { ThemeProvider } from './components/theme-provider';
-import { ModeToggle } from './components/ModeToggle';
 import { Updates } from './pages/Updates';
 import { Feedback } from './pages/Feedback';
 import { Admin } from './pages/Admin';
@@ -58,6 +64,7 @@ function App() {
         location.pathname === '/admin' ? 'admin' : 'simulator';
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Cooking the required details...');
   const [alertConfig, setAlertConfig] = useState<{
     open: boolean;
@@ -189,52 +196,71 @@ function App() {
           onParamChange={updateParam}
           onResetParams={resetParams}
           onNavigateHome={navigateHome}
-          onNavigateToSimulator={() => {
-            navigate('/');
-            setMobileSidebarOpen(false);
-          }}
-          onNavigateToGuide={() => {
-            navigate('/how-it-works');
-            setMobileSidebarOpen(false);
-          }}
-          onNavigateToUpdates={() => {
-            navigate('/updates');
-            setMobileSidebarOpen(false);
-          }}
-          onNavigateToFeedback={() => {
-            navigate('/feedback');
-            setMobileSidebarOpen(false);
-          }}
-          onNavigateToAdmin={() => {
-            navigate('/admin');
-            setMobileSidebarOpen(false);
-          }}
           onRunBacktest={() => {
             navigate('/');
             runBacktest();
           }}
           mobileOpen={mobileSidebarOpen}
           setMobileOpen={setMobileSidebarOpen}
-          activePage={currentPage}
         />
 
-        {/* Backdrop for mobile sidebar */}
-        {mobileSidebarOpen && (
+        {/* Backdrop for mobile overlays */}
+        {(mobileSidebarOpen || mobileNavOpen) && (
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"
-            onClick={() => setMobileSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden animate-in fade-in duration-300"
+            onClick={() => {
+              setMobileSidebarOpen(false);
+              setMobileNavOpen(false);
+            }}
           />
         )}
+
+        {/* Mobile Navigation Drawer */}
+        <div className={cn(
+          "fixed inset-y-0 left-0 z-50 w-72 bg-background border-r border-border transform transition-transform duration-300 ease-in-out lg:hidden glass",
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          <div className="p-6 border-b border-border flex items-center justify-between">
+            <h2 className="text-lg font-bold uppercase tracking-widest text-primary">Menu</h2>
+            <button onClick={() => setMobileNavOpen(false)} className="p-2 rounded-lg hover:bg-secondary">
+              <CloseIcon size={20} />
+            </button>
+          </div>
+          <div className="p-4 space-y-2">
+            {[
+              { id: 'simulator', label: 'Simulator', icon: LineChart, path: '/' },
+              { id: 'guide', label: 'How it works', icon: BookOpen, path: '/how-it-works' },
+              { id: 'updates', label: 'System Updates', icon: Activity, path: '/updates' },
+              { id: 'feedback', label: 'Feedback', icon: MessageSquare, path: '/feedback' },
+              { id: 'admin', label: 'Admin', icon: ShieldCheck, path: '/admin' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  navigate(item.path);
+                  setMobileNavOpen(false);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all font-bold uppercase text-[11px] tracking-tight active:scale-95",
+                  currentPage === item.id ? "bg-primary/10 text-primary shadow-[inset_0_0_10px_rgba(var(--primary-rgb),0.1)]" : "text-muted-foreground hover:bg-secondary/50"
+                )}
+              >
+                <item.icon size={18} />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="flex-1 flex flex-col overflow-hidden relative">
           {/* Persistent Mobile Header */}
           <header className="lg:hidden flex items-center justify-between px-6 py-4 border-b border-border bg-background/80 backdrop-blur-md z-20">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setMobileSidebarOpen(true)}
+                onClick={() => setMobileNavOpen(true)}
                 className="p-2.5 rounded-xl bg-secondary border border-border text-foreground hover:bg-secondary/80 transition-all active:scale-95 shadow-sm"
               >
-                <Settings size={20} />
+                <Menu size={20} />
               </button>
               <button
                 onClick={navigateHome}
@@ -244,8 +270,15 @@ function App() {
                 <span className="text-[10px] text-primary font-bold tracking-widest uppercase">Simulator</span>
               </button>
             </div>
-            <ModeToggle />
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-2.5 rounded-xl bg-secondary border border-border text-foreground hover:bg-secondary/80 transition-all active:scale-95 shadow-sm"
+            >
+              <Settings size={20} />
+            </button>
           </header>
+
+          <Navbar activePage={currentPage} />
 
           {/* Main Content */}
           <main

@@ -64,10 +64,19 @@ export const BacktestChart: React.FC<BacktestChartProps> = ({ data }) => {
                     <YAxis
                         stroke="#888"
                         fontSize={12}
-                        tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
+                        tickFormatter={(val) => {
+                            if (val >= 1000) {
+                                return `$${(val / 1000).toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 1
+                                })}k`;
+                            }
+                            return `$${val}`;
+                        }}
                         domain={['auto', 'auto']}
                         axisLine={false}
                         tickLine={false}
+                        width={60}
                     />
                     <Tooltip
                         contentStyle={{
