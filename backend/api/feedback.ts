@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, getConn } from './_shared/db.js';
+import { validateSymbol } from './_shared/validation.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Add CORS headers
@@ -38,7 +39,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // POST: Submit feedback (Public)
         if (req.method === 'POST') {
-            const { type, title, strategyName, description, logic, ticker, priority } = req.body;
+            const { type, title, strategyName, description, logic, priority } = req.body;
+            let ticker = req.body.ticker;
+
+            // Validate ticker if provided
+            if (ticker) {
+                try {
+                    ticker = validateSymbol(ticker);
+                } catch (e) {
+                    // If ticker is malformed, we can either reject or sanitize
+                    // For feedback, we'll just ensure it's a string and doesn't contain dangerous characters
+                    ticker = String(ticker).substring(0, 10).replace(/[^a-zA-Z0-9.]/g, '');
+                }
+            }
 
             // Map types to title/description fields
             const finalTitle = title || strategyName || (type === 'ticker' ? `Ticker Request: ${ticker}` : '');

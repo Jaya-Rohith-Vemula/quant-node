@@ -1,10 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, getConn } from './_shared/db.js';
+import { validateSymbol, validateLimit } from './_shared/validation.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
-        const symbol = (req.query.symbol as string) || 'SOFI';
-        const limit = parseInt((req.query.limit as string) || '100');
+        const symbol = validateSymbol(req.query.symbol || 'SOFI');
+        const limit = validateLimit(req.query.limit || '100');
 
         const conn = await getConn();
         const data = await db
