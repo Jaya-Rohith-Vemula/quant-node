@@ -46,6 +46,7 @@ interface Trade {
     type: string;
     price: number;
     shares: number;
+    accountBalance: number;
     profit: number;
     comment: string;
 }
@@ -132,6 +133,21 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, loading }) => {
             cell: ({ row }) => <div className="text-sm font-mono">{(row.getValue("shares") as number).toFixed(2)}</div>,
         },
         {
+            accessorKey: "accountBalance",
+            header: ({ column }) => (
+                <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                    className="flex items-center gap-1 -ml-2 font-bold uppercase tracking-wider text-[10px]"
+                >
+                    Balance
+                    <ArrowUpDown size={12} />
+                </Button>
+            ),
+            cell: ({ row }) => <div className="text-sm font-mono font-bold text-foreground">${(row.getValue("accountBalance") as number || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>,
+        },
+        {
             accessorKey: "profit",
             header: ({ column }) => (
                 <Button
@@ -170,6 +186,21 @@ export const TradeTable: React.FC<TradeTableProps> = ({ trades, loading }) => {
                 </Button>
             ),
             cell: ({ row }) => <div className="text-sm text-muted-foreground whitespace-nowrap">{row.getValue("datetime")}</div>,
+        },
+        {
+            accessorKey: "comment",
+            header: ({ column }) => (
+                <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                    className="flex items-center gap-1 -ml-2 font-bold uppercase tracking-wider text-[10px]"
+                >
+                    Comment
+                    <ArrowUpDown size={12} />
+                </Button>
+            ),
+            cell: ({ row }) => <div className="text-sm text-muted-foreground min-w-[200px]">{row.getValue("comment")}</div>,
         },
     ];
 
