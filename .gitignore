@@ -40,3 +40,6 @@ lerna-debug.log*
 
 # Scripts
 backend/analyze_db_storage.ts
+
+# Documentation Cache
+.docs_data/

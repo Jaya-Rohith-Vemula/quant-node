@@ -47,11 +47,14 @@ import type { BacktestParams, BacktestResults } from './types';
 const DEFAULT_PARAMS: BacktestParams = {
   symbol: 'SOFI',
   initialBalance: 10000,
-  moveDownPercent: 2,
-  moveUpPercent: 5,
-  amountToBuy: 1000,
   startDate: '2025-01-01',
-  endDate: '2025-02-28'
+  endDate: '2025-02-28',
+  strategyType: 'grid_trading',
+  strategyParams: {
+    moveDownPercent: 2,
+    moveUpPercent: 5,
+    amountToBuy: 1000,
+  }
 };
 
 function App() {
@@ -194,7 +197,18 @@ function App() {
   };
 
   const updateParam = (key: string, value: any) => {
-    setParams(prev => ({ ...prev, [key]: value }));
+    if (key.includes('.')) {
+      const [parent, child] = key.split('.');
+      setParams(prev => ({
+        ...prev,
+        [parent]: {
+          ...(prev[parent as keyof BacktestParams] as any),
+          [child]: value
+        }
+      }));
+    } else {
+      setParams(prev => ({ ...prev, [key]: value }));
+    }
   };
 
   const navigateHome = () => {
@@ -225,6 +239,7 @@ function App() {
           onResetParams={resetParams}
           onNavigateHome={navigateHome}
           onRunBacktest={() => {
+            setMobileSidebarOpen(false);
             navigate('/');
             runBacktest();
           }}
@@ -346,7 +361,7 @@ function App() {
             className="flex-1 p-4 md:p-8 overflow-y-auto relative w-full"
           >
             <Routes>
-              <Route path="/how-it-works" element={<StrategyGuide onBack={() => navigate('/')} />} />
+              <Route path="/how-it-works" element={<StrategyGuide strategyId={params.strategyType} onBack={() => navigate('/')} />} />
               <Route path="/updates" element={<Updates onBack={() => navigate('/')} />} />
               <Route path="/feedback" element={<Feedback onBack={() => navigate('/')} />} />
               <Route path="/admin" element={<Admin onBack={() => navigate('/')} />} />

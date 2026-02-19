@@ -12,13 +12,12 @@ interface Position {
 }
 
 export interface StrategyParams {
+    symbol: string;
     initialBalance: number;
-    moveDownPercent: number;
-    moveUpPercent: number;
-    amountToBuy: number;
     startDate: string;
     endDate: string;
-    symbol: string;
+    strategyType: string;
+    strategyParams: Record<string, any>;
 }
 
 export interface TradeRecord {
@@ -36,23 +35,60 @@ export interface TradeRecord {
     comment: string;
 }
 
+function calculateRSI(prices: number[], period: number) {
+    const rsis: (number | null)[] = [];
+    if (prices.length <= period) return new Array(prices.length).fill(null);
+
+    let gains = 0;
+    let losses = 0;
+
+    // Initial period
+    for (let i = 1; i <= period; i++) {
+        const diff = prices[i] - prices[i - 1];
+        if (diff > 0) gains += diff;
+        else losses -= diff;
+    }
+
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+
+    for (let i = 0; i < period; i++) rsis.push(null);
+
+    const initialRS = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    rsis.push(avgLoss === 0 ? 100 : 100 - (100 / (1 + initialRS)));
+
+    for (let i = period + 1; i < prices.length; i++) {
+        const diff = prices[i] - prices[i - 1];
+        const gain = diff > 0 ? diff : 0;
+        const loss = diff < 0 ? -diff : 0;
+
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+
+        if (avgLoss === 0) {
+            rsis.push(100);
+        } else {
+            const rs = avgGain / avgLoss;
+            rsis.push(100 - (100 / (1 + rs)));
+        }
+    }
+
+    return rsis;
+}
+
 export async function runBacktest(params: StrategyParams) {
     const conn = await getConn();
 
     const {
+        symbol,
         initialBalance,
-        moveDownPercent,
-        moveUpPercent,
-        amountToBuy,
         startDate,
         endDate,
-        symbol
+        strategyType,
+        strategyParams
     } = params;
 
-    const moveDownDecimal = moveDownPercent / 100;
-    const moveUpDecimal = moveUpPercent / 100;
-
-    console.log(`[${new Date().toISOString()}] Starting strategy analysis for ${symbol}...`);
+    console.log(`[${new Date().toISOString()}] Starting ${strategyType} analysis for ${symbol}...`);
 
     console.log(`[${new Date().toISOString()}] Querying OCI for ${symbol} data...`);
 
@@ -99,22 +135,17 @@ export async function runBacktest(params: StrategyParams) {
         };
     }
 
-    const dailyHighMap = new Map<string, number>();
+    // Common Simulation State
     let currentBalance = initialBalance;
     let openPositions: Position[] = [];
     let positionIdCounter = 1;
     let totalProfit = 0;
-    let referencePrice = 0;
-    let hasTraded = false;
     let trades: TradeRecord[] = [];
     let equityHistory: { datetime: string, accountBalance: number }[] = [];
     let tradeNoCounter = 1;
-    let maxSeenToday = 0;
-    let currentDateStr = '';
-
-    // Optimization: maintain total shares and equity to avoid reduce in every iteration
     let totalSharesHeld = 0;
     let totalInvestedInUnsold = 0;
+    let lastTradeDay = ''; // To avoid multiple trades on the same day for RSI
 
     // Performance metrics
     let peakValue = initialBalance;
@@ -122,6 +153,26 @@ export async function runBacktest(params: StrategyParams) {
     let minEquityTime = '';
     let maxDrawdownPercent = 0;
     let maxDrawdownAmount = 0;
+
+    // Strategy Specific Setup
+    let dailyHighMap = new Map<string, number>();
+    let maxSeenToday = 0;
+    let currentDateStr = '';
+    let referencePrice = 0;
+    let hasTradedGrid = false;
+
+    // Grid Trading Specific Params
+    const moveDownPercent = strategyParams.moveDownPercent ?? 2;
+    const moveUpPercent = strategyParams.moveUpPercent ?? 5;
+    const amountToBuyGrid = strategyParams.amountToBuy ?? 1000;
+    const moveDownDecimal = moveDownPercent / 100;
+    const moveUpDecimal = moveUpPercent / 100;
+
+    // RSI Specific Setup
+    const rsiPeriod = strategyParams.rsiPeriod ?? 14;
+    const oversoldThreshold = strategyParams.oversoldThreshold ?? 30;
+    const overboughtThreshold = strategyParams.overboughtThreshold ?? 70;
+    const rsiValues = strategyType === 'rsi_mean_reversion' ? calculateRSI(rows.map(r => r.close), rsiPeriod) : [];
 
     const get7DayHigh = (currentDateISO: string) => {
         const currentDate = parseISO(currentDateISO);
@@ -141,6 +192,7 @@ export async function runBacktest(params: StrategyParams) {
         const currentTime = row.datetime;
         const rowDate = row.date;
 
+        // Daily High Tracking (mostly for Grid Entry)
         if (rowDate !== currentDateStr) {
             if (currentDateStr !== '') {
                 dailyHighMap.set(currentDateStr, maxSeenToday);
@@ -148,15 +200,12 @@ export async function runBacktest(params: StrategyParams) {
             currentDateStr = rowDate;
             maxSeenToday = 0;
         }
-
         if (currentHigh > maxSeenToday) {
             maxSeenToday = currentHigh;
         }
 
-        // Drawdown calculation
+        // Drawdown & Equity Tracking
         const currentEquity = currentBalance + (totalSharesHeld * currentPrice);
-
-        // Record equity history (sampled for responsiveness, max ~1000 points)
         const sampleRate = Math.max(1, Math.floor(rows.length / 1000));
         if (i % sampleRate === 0 || i === rows.length - 1) {
             equityHistory.push({ datetime: currentTime, accountBalance: currentEquity });
@@ -170,74 +219,104 @@ export async function runBacktest(params: StrategyParams) {
 
         const currentDrawdownAmt = peakValue - currentEquity;
         const currentDrawdownPct = peakValue > 0 ? currentDrawdownAmt / peakValue : 0;
-
         if (currentDrawdownPct > maxDrawdownPercent) maxDrawdownPercent = currentDrawdownPct;
         if (currentDrawdownAmt > maxDrawdownAmount) maxDrawdownAmount = currentDrawdownAmt;
 
-        // SELL LOGIC
-        if (openPositions.length > 0) {
-            let remainingPositions: Position[] = [];
-            for (const pos of openPositions) {
-                const targetSellPrice = pos.buyPrice * (1 + moveUpDecimal);
-                if (currentPrice >= targetSellPrice) {
-                    const sellAmount = pos.shares * currentPrice;
-                    const profit = sellAmount - (pos.shares * pos.buyPrice);
-                    currentBalance += sellAmount;
-                    totalProfit += profit;
-                    referencePrice = currentPrice;
-                    hasTraded = true;
-                    totalSharesHeld -= pos.shares;
-                    totalInvestedInUnsold -= pos.amount;
+        // --- STRATEGY EXECUTION ---
+        let shouldBuy = false;
+        let shouldSell = false;
+        let buyReason = '';
+        let sellLots: Position[] = [];
 
-                    trades.push({
-                        tradeNo: tradeNoCounter++,
-                        datetime: currentTime,
-                        type: 'SELL',
-                        symbol,
-                        price: currentPrice,
-                        shares: pos.shares,
-                        totalShares: totalSharesHeld,
-                        remainingBalance: currentBalance,
-                        accountBalance: currentBalance + (totalSharesHeld * currentPrice),
-                        amount: sellAmount,
-                        profit: profit,
-                        comment: `Sold lot bought at ${pos.buyPrice.toFixed(2)}`
-                    });
-                } else {
-                    remainingPositions.push(pos);
+        if (strategyType === 'grid_trading') {
+            // SELL LOGIC (Grid)
+            for (const pos of openPositions) {
+                if (currentPrice >= pos.buyPrice * (1 + moveUpDecimal)) {
+                    shouldSell = true;
+                    sellLots.push(pos);
                 }
             }
-            openPositions = remainingPositions;
-        }
 
-        // BUY LOGIC
-        let shouldBuy = false;
-        let buyReason = '';
-
-        if (!hasTraded) {
-            const sevenDayHigh = get7DayHigh(rowDate);
-            if (sevenDayHigh > 0 && currentPrice <= sevenDayHigh * (1 - moveDownDecimal)) {
-                shouldBuy = true;
-                buyReason = `Initial entry: drop of ${moveDownPercent}% from 7-day high (${sevenDayHigh.toFixed(2)})`;
-            }
-        } else {
-            if (currentPrice <= referencePrice * (1 - moveDownDecimal)) {
-                shouldBuy = true;
-                buyReason = `Drop of ${moveDownPercent}% from last action (${referencePrice.toFixed(2)})`;
-            } else if (openPositions.length === 0) {
+            // BUY LOGIC (Grid)
+            if (!hasTradedGrid) {
                 const sevenDayHigh = get7DayHigh(rowDate);
                 if (sevenDayHigh > 0 && currentPrice <= sevenDayHigh * (1 - moveDownDecimal)) {
                     shouldBuy = true;
-                    buyReason = `Re-entry: drop of ${moveDownPercent}% from 7-day high (${sevenDayHigh.toFixed(2)})`;
+                    buyReason = `Initial entry: drop of ${moveDownPercent}% from 7-day high (${sevenDayHigh.toFixed(2)})`;
+                }
+            } else {
+                if (currentPrice <= referencePrice * (1 - moveDownDecimal)) {
+                    shouldBuy = true;
+                    buyReason = `Drop of ${moveDownPercent}% from last action (${referencePrice.toFixed(2)})`;
+                } else if (openPositions.length === 0) {
+                    const sevenDayHigh = get7DayHigh(rowDate);
+                    if (sevenDayHigh > 0 && currentPrice <= sevenDayHigh * (1 - moveDownDecimal)) {
+                        shouldBuy = true;
+                        buyReason = `Re-entry: drop of ${moveDownPercent}% from 7-day high (${sevenDayHigh.toFixed(2)})`;
+                    }
+                }
+            }
+        } else if (strategyType === 'rsi_mean_reversion') {
+            const currentRSI = rsiValues![i];
+            if (currentRSI !== null) {
+                // SELL LOGIC (RSI: Exit when overbought)
+                if (currentRSI >= overboughtThreshold && openPositions.length > 0) {
+                    shouldSell = true;
+                    sellLots = [...openPositions]; // Sell all positions
+                }
+
+                // BUY LOGIC (RSI: Entry when oversold)
+                if (currentRSI <= oversoldThreshold && currentBalance >= (initialBalance * 0.1)) {
+                    // Only buy if we haven't traded today and have room for positions
+                    if (rowDate !== lastTradeDay && openPositions.length < 5) {
+                        shouldBuy = true;
+                        buyReason = `RSI Oversold: ${currentRSI.toFixed(2)} (Threshold: ${oversoldThreshold})`;
+                    }
                 }
             }
         }
 
+        // Execute Sells
+        if (shouldSell && sellLots.length > 0) {
+            for (const pos of sellLots) {
+                const sellAmount = pos.shares * currentPrice;
+                const profit = sellAmount - pos.amount;
+                currentBalance += sellAmount;
+                totalProfit += profit;
+                totalSharesHeld -= pos.shares;
+                totalInvestedInUnsold -= pos.amount;
+
+                if (strategyType === 'grid_trading') referencePrice = currentPrice;
+                hasTradedGrid = true;
+
+                trades.push({
+                    tradeNo: tradeNoCounter++,
+                    datetime: currentTime,
+                    type: 'SELL',
+                    symbol,
+                    price: currentPrice,
+                    shares: pos.shares,
+                    totalShares: totalSharesHeld,
+                    remainingBalance: currentBalance,
+                    accountBalance: currentBalance + (totalSharesHeld * currentPrice),
+                    amount: sellAmount,
+                    profit,
+                    comment: `Sold lot bought at ${pos.buyPrice.toFixed(2)} (${strategyType === 'rsi_mean_reversion' ? 'RSI Exit' : 'Grid Target'})`
+                });
+
+                // Remove from open positions
+                openPositions = openPositions.filter(p => p.id !== pos.id);
+            }
+        }
+
+        // Execute Buys
+        const amountToBuy = strategyType === 'grid_trading' ? amountToBuyGrid : (initialBalance * 0.1); // RSI buys 10% of initial balance
         if (shouldBuy && currentBalance >= amountToBuy) {
             const sharesToBuy = amountToBuy / currentPrice;
             currentBalance -= amountToBuy;
-            referencePrice = currentPrice;
-            hasTraded = true;
+            if (strategyType === 'grid_trading') referencePrice = currentPrice;
+            hasTradedGrid = true;
+            lastTradeDay = rowDate; // Record the day of the trade
             totalSharesHeld += sharesToBuy;
             totalInvestedInUnsold += amountToBuy;
 
@@ -267,7 +346,6 @@ export async function runBacktest(params: StrategyParams) {
     }
 
     console.log(`[${new Date().toISOString()}] Processing complete for ${symbol}`);
-
     const finalAccountValue = currentBalance + (totalSharesHeld * (rows[rows.length - 1] as any).close);
 
     return {

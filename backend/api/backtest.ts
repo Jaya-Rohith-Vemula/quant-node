@@ -9,13 +9,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         console.log(`[${new Date().toISOString()}] Incoming backtest request:`, req.body);
         const params: StrategyParams = {
+            symbol: req.body.symbol || 'SOFI',
             initialBalance: parseFloat(req.body.initialBalance || '10000'),
-            moveDownPercent: parseFloat(req.body.moveDownPercent || '2'),
-            moveUpPercent: parseFloat(req.body.moveUpPercent || '5'),
-            amountToBuy: parseFloat(req.body.amountToBuy || '1000'),
             startDate: req.body.startDate || '2022-01-01',
             endDate: req.body.endDate || '2099-12-31',
-            symbol: req.body.symbol || 'SOFI'
+            strategyType: req.body.strategyType || 'grid_trading',
+            strategyParams: req.body.strategyParams || {}
         };
 
         console.log('Running backtest with params:', params);

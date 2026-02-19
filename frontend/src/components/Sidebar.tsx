@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Settings,
     Calendar as CalendarIcon,
@@ -26,6 +27,7 @@ import {
 } from "./ui/select";
 import { cn } from "../lib/utils";
 import type { BacktestParams } from '../types';
+import { STRATEGIES } from '../strategies';
 
 interface SidebarProps {
     params: BacktestParams;
@@ -43,6 +45,7 @@ interface SidebarProps {
 export function Sidebar({ params, loading, availableSymbols = [], symbolsLoading = false, onParamChange, onResetParams, onNavigateHome, onRunBacktest, mobileOpen, setMobileOpen }: SidebarProps) {
     const [startDateOpen, setStartDateOpen] = useState(false);
     const [endDateOpen, setEndDateOpen] = useState(false);
+    const navigate = useNavigate();
 
     return (
         <aside className={cn(
@@ -115,6 +118,45 @@ export function Sidebar({ params, loading, availableSymbols = [], symbolsLoading
                                 ))}
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">Strategy Type</label>
+                        <Select
+                            value={params.strategyType}
+                            onValueChange={(val) => {
+                                onParamChange('strategyType', val);
+                                const strategy = STRATEGIES.find(s => s.id === val);
+                                if (strategy) {
+                                    const defaults: Record<string, any> = {};
+                                    strategy.parameters.forEach(p => defaults[p.key] = p.defaultValue);
+                                    onParamChange('strategyParams', defaults);
+                                }
+                            }}
+                        >
+                            <SelectTrigger className="w-full bg-secondary/50 border border-border h-10 text-sm font-mono mb-2 focus:ring-1 focus:ring-primary text-foreground">
+                                <SelectValue placeholder="Select Strategy" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border">
+                                {STRATEGIES.map((s) => (
+                                    <SelectItem key={s.id} value={s.id}>
+                                        {s.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <div className="flex justify-end px-1">
+                            <button
+                                onClick={() => {
+                                    if (setMobileOpen) setMobileOpen(false);
+                                    navigate('/how-it-works');
+                                }}
+                                className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all hover:gap-2 group"
+                            >
+                                How it works
+                                <span className="group-hover:translate-x-1 transition-transform">→</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 pb-4">
@@ -194,33 +236,19 @@ export function Sidebar({ params, loading, availableSymbols = [], symbolsLoading
                     unit="$"
                     onChange={(v) => onParamChange('initialBalance', v)}
                 />
-                <ParameterSlider
-                    label="Grid Step (Down)"
-                    value={params.moveDownPercent}
-                    min={0.5}
-                    max={20}
-                    step={0.5}
-                    unit="%"
-                    onChange={(v) => onParamChange('moveDownPercent', v)}
-                />
-                <ParameterSlider
-                    label="Profit Target (Up)"
-                    value={params.moveUpPercent}
-                    min={1}
-                    max={30}
-                    step={0.5}
-                    unit="%"
-                    onChange={(v) => onParamChange('moveUpPercent', v)}
-                />
-                <ParameterSlider
-                    label="Buy Size"
-                    value={params.amountToBuy}
-                    min={100}
-                    max={10000}
-                    step={100}
-                    unit="$"
-                    onChange={(v) => onParamChange('amountToBuy', v)}
-                />
+
+                {STRATEGIES.find(s => s.id === params.strategyType)?.parameters.map((p) => (
+                    <ParameterSlider
+                        key={p.key}
+                        label={p.label}
+                        value={params.strategyParams[p.key] ?? p.defaultValue}
+                        min={p.min}
+                        max={p.max}
+                        step={p.step}
+                        unit={p.unit}
+                        onChange={(v) => onParamChange(`strategyParams.${p.key}`, v)}
+                    />
+                ))}
 
                 <button
                     onClick={onRunBacktest}

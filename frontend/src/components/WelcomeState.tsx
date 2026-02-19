@@ -20,7 +20,7 @@ export function WelcomeState({ onOpenSidebar, onNavigateToGuide }: WelcomeStateP
             <div className="space-y-4 max-w-md">
                 <h2 className="text-3xl md:text-4xl font-black tracking-tight">Welcome to Quant Node</h2>
                 <p className="text-muted-foreground text-base md:text-lg leading-relaxed">
-                    The ultimate grid trading backtester. Configure your strategy parameters and hit <span className="text-primary font-bold">Run Simulation</span> to analyze market behavior.
+                    The ultimate quantitative trading backtester. Configure your strategy parameters and hit <span className="text-primary font-bold">Run Simulation</span> to analyze market behavior.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">

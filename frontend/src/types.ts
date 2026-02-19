@@ -16,11 +16,10 @@ export interface BacktestSummary {
 export interface BacktestParams {
     symbol: string;
     initialBalance: number;
-    moveDownPercent: number;
-    moveUpPercent: number;
-    amountToBuy: number;
     startDate: string;
     endDate: string;
+    strategyType: string;
+    strategyParams: Record<string, any>;
 }
 
 export interface BacktestResults {
