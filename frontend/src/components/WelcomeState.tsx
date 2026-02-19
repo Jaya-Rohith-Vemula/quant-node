@@ -1,13 +1,14 @@
-import { LineChart, Settings, Zap, BarChart3, MousePointer2, BookOpen } from 'lucide-react';
+import { LineChart, Settings, Zap, BarChart3, MousePointer2, BookOpen, MessageSquare, ArrowRight } from 'lucide-react';
 import { FeatureCard } from './FeatureCard';
 import { GithubIcon, XIcon, LinkedinIcon } from './SocialIcons';
 
 interface WelcomeStateProps {
     onOpenSidebar: () => void;
     onNavigateToGuide: () => void;
+    onNavigateToFeedback: () => void;
 }
 
-export function WelcomeState({ onOpenSidebar, onNavigateToGuide }: WelcomeStateProps) {
+export function WelcomeState({ onOpenSidebar, onNavigateToGuide, onNavigateToFeedback }: WelcomeStateProps) {
     return (
         <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in zoom-in duration-700 py-12">
             <div className="relative">
@@ -20,8 +21,26 @@ export function WelcomeState({ onOpenSidebar, onNavigateToGuide }: WelcomeStateP
             <div className="space-y-4 max-w-md">
                 <h2 className="text-3xl md:text-4xl font-black tracking-tight">Welcome to Quant Node</h2>
                 <p className="text-muted-foreground text-base md:text-lg leading-relaxed">
-                    The ultimate quantitative trading backtester. Configure your strategy parameters and hit <span className="text-primary font-bold">Run Simulation</span> to analyze market behavior.
+                    The ultimate quantitative trading backtester. Change strategy types in the settings to explore different algorithms, then hit <span className="text-primary font-bold">Run Simulation</span> to analyze results.
                 </p>
+
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 text-sm text-muted-foreground space-y-3 max-w-[95%] mx-auto relative group/card">
+                    <p className="flex items-center justify-center gap-2 text-primary font-semibold">
+                        <Zap size={14} />
+                        More Strategies Coming Soon
+                    </p>
+                    <p>
+                        More strategies are being added as we speak! We'd love your feedback on app improvements or new strategies you'd like to see.
+                    </p>
+                    <button
+                        onClick={onNavigateToFeedback}
+                        className="flex items-center gap-2 mx-auto py-2 px-4 rounded-xl bg-primary/10 text-primary font-bold text-xs hover:bg-primary hover:text-primary-foreground transition-all active:scale-95 group/btn border border-primary/20 cursor-pointer"
+                    >
+                        <MessageSquare size={14} />
+                        Share Feedback
+                        <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                    </button>
+                </div>
 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
                     <button

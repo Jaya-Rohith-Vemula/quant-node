@@ -398,6 +398,7 @@ function App() {
                       <WelcomeState
                         onOpenSidebar={() => setMobileSidebarOpen(true)}
                         onNavigateToGuide={() => navigate('/how-it-works')}
+                        onNavigateToFeedback={() => navigate('/feedback')}
                       />
                     ) : (
                       <>
