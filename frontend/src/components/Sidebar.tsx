@@ -145,6 +145,25 @@ export function Sidebar({ params, loading, availableSymbols = [], symbolsLoading
                                 ))}
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">Simulation Timeframe</label>
+                        <Select
+                            value={params.timeframe || '1m'}
+                            onValueChange={(val) => onParamChange('timeframe', val)}
+                        >
+                            <SelectTrigger className="w-full bg-secondary/50 border border-border h-10 text-sm font-mono mb-2 focus:ring-1 focus:ring-primary text-foreground">
+                                <SelectValue placeholder="Select Timeframe" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border">
+                                <SelectItem value="1m">1 Minute</SelectItem>
+                                <SelectItem value="5m">5 Minutes</SelectItem>
+                                <SelectItem value="15m">15 Minutes</SelectItem>
+                                <SelectItem value="1h">1 Hour</SelectItem>
+                                <SelectItem value="1d">1 Day (Daily)</SelectItem>
+                            </SelectContent>
+                        </Select>
                         <div className="flex justify-end px-1">
                             <button
                                 onClick={() => {

@@ -54,7 +54,8 @@ const DEFAULT_PARAMS: BacktestParams = {
     moveDownPercent: 2,
     moveUpPercent: 5,
     amountToBuy: 1000,
-  }
+  },
+  timeframe: '1m'
 };
 
 function App() {
@@ -421,12 +422,13 @@ function App() {
                           </div>
                         </header>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                           <StatCard
                             label="Total Net Worth"
                             value={`$${results.summary?.finalAccountValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
                             icon={<DollarSign size={20} />}
                             trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
+                            trendValue={results.summary ? `${results.summary.finalAccountValue >= results.summary.initialBalance ? '+' : ''}${(((results.summary.finalAccountValue / results.summary.initialBalance) - 1) * 100).toFixed(2)}%` : undefined}
                             loading={loading}
                           />
                           <StatCard
@@ -441,11 +443,20 @@ function App() {
                             value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
                             icon={<TrendingDown size={20} />}
                             loading={loading}
+                            subtitle={results.summary ? `${format(new Date(results.summary.maxDrawdownPeakTime), "MMM d, yy")} - ${format(new Date(results.summary.maxDrawdownTroughTime), "MMM d, yy")}` : undefined}
                           />
                           <StatCard
                             label="Trades Executed"
                             value={(results.trades?.length || 0).toString()}
                             icon={<Activity size={20} />}
+                            loading={loading}
+                          />
+                          <StatCard
+                            label="Buy & Hold"
+                            value={`$${results.summary?.buyAndHoldFinalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                            icon={<TrendingUp size={20} className="text-blue-400" />}
+                            trend={results.summary ? (results.summary.buyAndHoldFinalValue > results.summary.initialBalance) : null}
+                            trendValue={results.summary ? `${results.summary.buyAndHoldReturnPercent >= 0 ? '+' : ''}${results.summary.buyAndHoldReturnPercent.toFixed(2)}%` : undefined}
                             loading={loading}
                           />
                         </div>

@@ -11,6 +11,10 @@ export interface BacktestSummary {
     minEquityTime: string;
     peakValue: number;
     initialBalance: number;
+    buyAndHoldFinalValue: number;
+    buyAndHoldReturnPercent: number;
+    maxDrawdownPeakTime: string;
+    maxDrawdownTroughTime: string;
 }
 
 export interface BacktestParams {
@@ -20,6 +24,7 @@ export interface BacktestParams {
     endDate: string;
     strategyType: string;
     strategyParams: Record<string, any>;
+    timeframe?: string;
 }
 
 export interface BacktestResults {

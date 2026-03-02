@@ -3,9 +3,9 @@ import { db, getConn } from './db.js';
 import oracledb from 'oracledb';
 
 interface Position {
-    // ... (omitting for brevity in this thought, will use full block in tool call)
     id: number;
     buyPrice: number;
+    peakPrice: number; // Added to track highest price since purchase for trailing stops
     shares: number;
     amount: number;
     buyTime: string;
@@ -18,6 +18,7 @@ export interface StrategyParams {
     endDate: string;
     strategyType: string;
     strategyParams: Record<string, any>;
+    timeframe?: string; // New: 1m (default), 5m, 15m, 1h, 1d
 }
 
 export interface TradeRecord {
@@ -76,6 +77,40 @@ function calculateRSI(prices: number[], period: number) {
     return rsis;
 }
 
+function calculateSMA(prices: number[], period: number) {
+    const smas: (number | null)[] = [];
+    if (prices.length < period) return new Array(prices.length).fill(null);
+
+    let sum = 0;
+    for (let i = 0; i < prices.length; i++) {
+        sum += prices[i];
+        if (i >= period) {
+            sum -= prices[i - period];
+        }
+        if (i >= period - 1) {
+            smas.push(sum / period);
+        } else {
+            smas.push(null);
+        }
+    }
+    return smas;
+}
+
+function calculateEMA(prices: number[], period: number) {
+    const emas: (number | null)[] = [];
+    if (prices.length === 0) return emas;
+
+    const k = 2 / (period + 1);
+    let ema = prices[0];
+    emas.push(ema);
+
+    for (let i = 1; i < prices.length; i++) {
+        ema = (prices[i] * k) + (ema * (1 - k));
+        emas.push(ema);
+    }
+    return emas;
+}
+
 export async function runBacktest(params: StrategyParams) {
     const conn = await getConn();
 
@@ -85,12 +120,37 @@ export async function runBacktest(params: StrategyParams) {
         startDate,
         endDate,
         strategyType,
-        strategyParams
+        strategyParams,
+        timeframe = '1m'
     } = params;
 
-    console.log(`[${new Date().toISOString()}] Starting ${strategyType} analysis for ${symbol}...`);
+    console.log(`[${new Date().toISOString()}] Starting ${strategyType} analysis for ${symbol} on ${timeframe} timeframe...`);
 
-    console.log(`[${new Date().toISOString()}] Querying OCI for ${symbol} data...`);
+    // --- LOOKBACK BUFFER CALCULATION ---
+    // If we have periods (like 200 SMA), we need data BEFORE the 'startDate' to have a signal on day 1.
+    const fastPeriodReq = strategyParams.fastPeriod ?? 50;
+    const slowPeriodReq = strategyParams.slowPeriod ?? 200;
+    const rsiPeriodReq = strategyParams.rsiPeriod ?? 14;
+    const maxPeriod = Math.max(fastPeriodReq, slowPeriodReq, rsiPeriodReq);
+
+    let queryStartDate = startDate;
+    if (maxPeriod > 0) {
+        const startDt = parseISO(startDate);
+        let lookbackDays = 0;
+        if (timeframe === '1d' || timeframe === '1-day' || timeframe === 'Daily') {
+            lookbackDays = maxPeriod * 1.5 + 20; // 1.5x for weekends/holidays
+        } else if (timeframe === '1h' || timeframe === 'hourly') {
+            lookbackDays = Math.ceil((maxPeriod / 6.5) * 1.5) + 5; // ~6.5 trading hours per day
+        } else if (timeframe.endsWith('m')) {
+            const mins = parseInt(timeframe);
+            lookbackDays = Math.ceil(((maxPeriod * mins) / 390) * 1.5) + 2;
+        } else {
+            lookbackDays = 20; // default safe buffer for 1m
+        }
+        queryStartDate = format(subDays(startDt, Math.max(2, lookbackDays)), 'yyyy-MM-dd');
+    }
+
+    console.log(`[${new Date().toISOString()}] Querying OCI for ${symbol} data from ${queryStartDate} (Buffer for indicators)...`);
 
     // Use raw oracledb connection for the large fetch for better performance
     let result;
@@ -102,7 +162,7 @@ export async function runBacktest(params: StrategyParams) {
                AND "datetime" >= :startDate 
                AND "datetime" <= :endDate 
              ORDER BY "datetime" ASC`,
-            { symbol, startDate, endDate },
+            { symbol, startDate: queryStartDate, endDate },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
     } catch (err: any) {
@@ -110,8 +170,58 @@ export async function runBacktest(params: StrategyParams) {
         throw err;
     }
 
-    const rows = result.rows as any[];
+    let rows = result.rows as any[];
     console.log(`[${new Date().toISOString()}] Retrieved ${rows.length} rows from OCI for ${symbol}`);
+
+    // --- DATA RESAMPLING ---
+    if (timeframe !== '1m' && timeframe !== '1-minute' && rows.length > 0) {
+        console.log(`[${new Date().toISOString()}] Resampling data to ${timeframe}...`);
+        const resampled: any[] = [];
+        let currentBar: any = null;
+
+        const getBarKey = (row: any) => {
+            // "2024-10-01 04:00" -> Date object
+            const dt = new Date(row.datetime.replace(' ', 'T'));
+            if (timeframe === '1d' || timeframe === '1-day' || timeframe === 'Daily') {
+                return row.date;
+            }
+            if (timeframe === '1h' || timeframe === 'hourly') {
+                dt.setMinutes(0, 0, 0);
+                return format(dt, 'yyyy-MM-dd HH:mm');
+            }
+            if (timeframe.endsWith('m')) {
+                const mins = parseInt(timeframe);
+                const currentMins = dt.getMinutes();
+                dt.setMinutes(Math.floor(currentMins / mins) * mins, 0, 0);
+                return format(dt, 'yyyy-MM-dd HH:mm');
+            }
+            return row.date;
+        };
+
+        for (const row of rows) {
+            const key = getBarKey(row);
+            if (!currentBar || currentBar.datetime !== key) {
+                if (currentBar) resampled.push(currentBar);
+                currentBar = {
+                    datetime: key,
+                    date: key.split(' ')[0],
+                    open: row.open,
+                    high: row.high,
+                    low: row.low,
+                    close: row.close,
+                    volume: row.volume
+                };
+            } else {
+                currentBar.high = Math.max(currentBar.high, row.high);
+                currentBar.low = Math.min(currentBar.low, row.low);
+                currentBar.close = row.close;
+                currentBar.volume += row.volume;
+            }
+        }
+        if (currentBar) resampled.push(currentBar);
+        rows = resampled;
+        console.log(`[${new Date().toISOString()}] Resampled to ${rows.length} rows`);
+    }
 
     if (rows.length === 0) {
         console.warn('No data found for the selected symbol and date range.');
@@ -127,10 +237,10 @@ export async function runBacktest(params: StrategyParams) {
                 finalAccountValue: initialBalance,
                 maxDrawdownPercent: 0,
                 maxDrawdownAmount: 0,
-                minEquity: initialBalance,
-                minEquityTime: '',
                 peakValue: initialBalance,
-                initialBalance
+                initialBalance,
+                buyAndHoldFinalValue: initialBalance,
+                buyAndHoldReturnPercent: 0
             }
         };
     }
@@ -141,18 +251,29 @@ export async function runBacktest(params: StrategyParams) {
     let positionIdCounter = 1;
     let totalProfit = 0;
     let trades: TradeRecord[] = [];
-    let equityHistory: { datetime: string, accountBalance: number }[] = [];
+    let equityHistory: { datetime: string, accountBalance: number, buyAndHoldBalance: number, stockPrice: number }[] = [];
     let tradeNoCounter = 1;
     let totalSharesHeld = 0;
     let totalInvestedInUnsold = 0;
     let lastTradeDay = ''; // To avoid multiple trades on the same day for RSI
 
+    // Buy-and-Hold Baseline calculation
+    // Important: Buy price should be the first price AT or AFTER the requested startDate
+    const startIdx = rows.findIndex(r => r.datetime >= startDate);
+    const simulationStartIndex = startIdx === -1 ? 0 : startIdx;
+
+    const initialPrice = rows[simulationStartIndex] ? rows[simulationStartIndex].close : rows[0].close;
+    const buyAndHoldShares = initialBalance / initialPrice;
+
     // Performance metrics
     let peakValue = initialBalance;
+    let peakValueTime = rows[0].datetime;
     let minEquity = initialBalance;
-    let minEquityTime = '';
+    let minEquityTime = rows[0].datetime;
     let maxDrawdownPercent = 0;
     let maxDrawdownAmount = 0;
+    let maxDrawdownPeakTime = rows[0].datetime;
+    let maxDrawdownTroughTime = rows[0].datetime;
 
     // Strategy Specific Setup
     let dailyHighMap = new Map<string, number>();
@@ -174,6 +295,14 @@ export async function runBacktest(params: StrategyParams) {
     const overboughtThreshold = strategyParams.overboughtThreshold ?? 70;
     const rsiValues = strategyType === 'rsi_mean_reversion' ? calculateRSI(rows.map(r => r.close), rsiPeriod) : [];
 
+    // SMA Specific Setup
+    const fastPeriod = strategyParams.fastPeriod ?? 50;
+    const slowPeriod = strategyParams.slowPeriod ?? 200;
+    const trailingStopPercent = strategyParams.trailingStopPercent ?? 0;
+
+    const fastSMA = strategyType === 'sma_crossover' ? calculateSMA(rows.map(r => r.close), fastPeriod) : [];
+    const slowSMA = strategyType === 'sma_crossover' ? calculateSMA(rows.map(r => r.close), slowPeriod) : [];
+
     const get7DayHigh = (currentDateISO: string) => {
         const currentDate = parseISO(currentDateISO);
         let maxHigh = maxSeenToday;
@@ -192,6 +321,11 @@ export async function runBacktest(params: StrategyParams) {
         const currentTime = row.datetime;
         const rowDate = row.date;
 
+        // Skip simulation before the actual requested start date (these were just for indicator buffer)
+        if (currentTime < startDate) {
+            continue;
+        }
+
         // Daily High Tracking (mostly for Grid Entry)
         if (rowDate !== currentDateStr) {
             if (currentDateStr !== '') {
@@ -206,12 +340,22 @@ export async function runBacktest(params: StrategyParams) {
 
         // Drawdown & Equity Tracking
         const currentEquity = currentBalance + (totalSharesHeld * currentPrice);
+        const buyAndHoldBalance = buyAndHoldShares * currentPrice;
+
         const sampleRate = Math.max(1, Math.floor(rows.length / 1000));
         if (i % sampleRate === 0 || i === rows.length - 1) {
-            equityHistory.push({ datetime: currentTime, accountBalance: currentEquity });
+            equityHistory.push({
+                datetime: currentTime,
+                accountBalance: currentEquity,
+                buyAndHoldBalance: buyAndHoldBalance,
+                stockPrice: currentPrice
+            });
         }
 
-        if (currentEquity > peakValue) peakValue = currentEquity;
+        if (currentEquity > peakValue) {
+            peakValue = currentEquity;
+            peakValueTime = currentTime;
+        }
         if (currentEquity < minEquity) {
             minEquity = currentEquity;
             minEquityTime = currentTime;
@@ -219,13 +363,18 @@ export async function runBacktest(params: StrategyParams) {
 
         const currentDrawdownAmt = peakValue - currentEquity;
         const currentDrawdownPct = peakValue > 0 ? currentDrawdownAmt / peakValue : 0;
-        if (currentDrawdownPct > maxDrawdownPercent) maxDrawdownPercent = currentDrawdownPct;
+        if (currentDrawdownPct > maxDrawdownPercent) {
+            maxDrawdownPercent = currentDrawdownPct;
+            maxDrawdownPeakTime = peakValueTime;
+            maxDrawdownTroughTime = currentTime;
+        }
         if (currentDrawdownAmt > maxDrawdownAmount) maxDrawdownAmount = currentDrawdownAmt;
 
         // --- STRATEGY EXECUTION ---
         let shouldBuy = false;
         let shouldSell = false;
         let buyReason = '';
+        let sellReason = '';
         let sellLots: Position[] = [];
 
         if (strategyType === 'grid_trading') {
@@ -263,6 +412,7 @@ export async function runBacktest(params: StrategyParams) {
                 if (currentRSI >= overboughtThreshold && openPositions.length > 0) {
                     shouldSell = true;
                     sellLots = [...openPositions]; // Sell all positions
+                    sellReason = `RSI Overbought: ${currentRSI.toFixed(2)} (Threshold: ${overboughtThreshold})`;
                 }
 
                 // BUY LOGIC (RSI: Entry when oversold)
@@ -271,6 +421,80 @@ export async function runBacktest(params: StrategyParams) {
                     if (rowDate !== lastTradeDay && openPositions.length < 5) {
                         shouldBuy = true;
                         buyReason = `RSI Oversold: ${currentRSI.toFixed(2)} (Threshold: ${oversoldThreshold})`;
+                    }
+                }
+            }
+        } else if (strategyType === 'sma_crossover') {
+            const currentFast = fastSMA[i];
+            const currentSlow = slowSMA[i];
+            const prevFast = i > 0 ? fastSMA[i - 1] : null;
+            const prevSlow = i > 0 ? slowSMA[i - 1] : null;
+
+            const usePriceCross = strategyParams.usePriceCross === 1;
+            const exitBuffer = (strategyParams.exitBufferPercent ?? 0) / 100;
+
+            if (currentFast !== null && currentSlow !== null) {
+                // --- SELL LOGIC ---
+                if (openPositions.length > 0) {
+                    let triggered = false;
+                    let reason = '';
+
+                    if (usePriceCross) {
+                        // Speed Mode: Exit if price drops below Fast SMA with a buffer
+                        const exitThreshold = currentFast * (1 - exitBuffer);
+                        if (currentPrice < exitThreshold) {
+                            triggered = true;
+                            reason = `Price (${currentPrice.toFixed(2)}) < Fast SMA Buffer (${exitThreshold.toFixed(2)})`;
+                        }
+                    } else if (prevFast !== null && prevSlow !== null) {
+                        // Classic Mode: Death Cross
+                        if (currentFast < currentSlow && prevFast >= prevSlow) {
+                            triggered = true;
+                            reason = `SMA Death Cross: Fast (${currentFast.toFixed(4)}) < Slow (${currentSlow.toFixed(4)})`;
+                        }
+                    }
+
+                    if (triggered) {
+                        shouldSell = true;
+                        sellLots = [...openPositions];
+                        sellReason = reason;
+                    }
+                }
+
+                // --- BUY LOGIC ---
+                if (openPositions.length < 1) {
+                    if (usePriceCross) {
+                        // Speed Mode: Price crosses Fast SMA, with Slow SMA as a long-term filter
+                        if (currentPrice > currentFast && currentPrice > currentSlow) {
+                            shouldBuy = true;
+                            buyReason = `Price (${currentPrice.toFixed(2)}) > Fast SMA (${currentFast.toFixed(2)}) & Slow SMA (${currentSlow.toFixed(2)})`;
+                        }
+                    } else if (prevFast !== null && prevSlow !== null) {
+                        // Classic Mode: Golden Cross
+                        if (currentFast > currentSlow) {
+                            shouldBuy = true;
+                            buyReason = `SMA Trend: Fast (${currentFast.toFixed(4)}) > Slow (${currentSlow.toFixed(4)})`;
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- TRAILING STOP LOSS CHECK ---
+        if (trailingStopPercent > 0 && openPositions.length > 0) {
+            const stopMultiplier = 1 - (trailingStopPercent / 100);
+            for (const pos of openPositions) {
+                // Update peak price if current price is higher
+                if (currentPrice > pos.peakPrice) {
+                    pos.peakPrice = currentPrice;
+                }
+
+                // Check trailing stop condition (if not already selling by other logic)
+                if (!sellLots.find(p => p.id === pos.id)) {
+                    if (currentPrice <= pos.peakPrice * stopMultiplier) {
+                        shouldSell = true;
+                        sellReason = `Trailing Stop: Price (${currentPrice.toFixed(2)}) dropped below ${trailingStopPercent}% from peak (${pos.peakPrice.toFixed(2)})`;
+                        sellLots.push(pos);
                     }
                 }
             }
@@ -285,6 +509,8 @@ export async function runBacktest(params: StrategyParams) {
                 totalProfit += profit;
                 totalSharesHeld -= pos.shares;
                 totalInvestedInUnsold -= pos.amount;
+
+                let sellComment = sellReason || 'Grid Target';
 
                 if (strategyType === 'grid_trading') referencePrice = currentPrice;
                 hasTradedGrid = true;
@@ -301,7 +527,7 @@ export async function runBacktest(params: StrategyParams) {
                     accountBalance: currentBalance + (totalSharesHeld * currentPrice),
                     amount: sellAmount,
                     profit,
-                    comment: `Sold lot bought at ${pos.buyPrice.toFixed(2)} (${strategyType === 'rsi_mean_reversion' ? 'RSI Exit' : 'Grid Target'})`
+                    comment: `Sold lot bought at ${pos.buyPrice.toFixed(2)} (${sellComment})`
                 });
 
                 // Remove from open positions
@@ -310,8 +536,16 @@ export async function runBacktest(params: StrategyParams) {
         }
 
         // Execute Buys
-        const amountToBuy = strategyType === 'grid_trading' ? amountToBuyGrid : (initialBalance * 0.1); // RSI buys 10% of initial balance
-        if (shouldBuy && currentBalance >= amountToBuy) {
+        let amountToBuy = 0;
+        if (strategyType === 'grid_trading') {
+            amountToBuy = amountToBuyGrid;
+        } else if (strategyType === 'rsi_mean_reversion') {
+            amountToBuy = initialBalance * 0.1;
+        } else if (strategyType === 'sma_crossover') {
+            amountToBuy = currentBalance;
+        }
+
+        if (shouldBuy && currentBalance >= amountToBuy && amountToBuy > 0) {
             const sharesToBuy = amountToBuy / currentPrice;
             currentBalance -= amountToBuy;
             if (strategyType === 'grid_trading') referencePrice = currentPrice;
@@ -323,6 +557,7 @@ export async function runBacktest(params: StrategyParams) {
             openPositions.push({
                 id: positionIdCounter++,
                 buyPrice: currentPrice,
+                peakPrice: currentPrice, // Initialize peakPrice at buyPrice
                 shares: sharesToBuy,
                 amount: amountToBuy,
                 buyTime: currentTime
@@ -363,7 +598,11 @@ export async function runBacktest(params: StrategyParams) {
             minEquity,
             minEquityTime,
             peakValue,
-            initialBalance
+            initialBalance,
+            buyAndHoldFinalValue: buyAndHoldShares * (rows[rows.length - 1] as any).close,
+            buyAndHoldReturnPercent: ((buyAndHoldShares * (rows[rows.length - 1] as any).close - initialBalance) / initialBalance) * 100,
+            maxDrawdownPeakTime,
+            maxDrawdownTroughTime
         }
     };
 }

@@ -111,5 +111,67 @@ export const STRATEGIES: Strategy[] = [
                 defaultValue: 70,
             },
         ],
+    },
+    {
+        id: 'sma_crossover',
+        name: 'SMA Crossover',
+        description: 'A classic trend-following strategy that triggers buy/sell signals when a short-term moving average crosses a long-term one.',
+        guide: {
+            entry: "Enters a long position when the 'Fast' SMA crosses above the 'Slow' SMA (Golden Cross). If Volume Filter is enabled, entry only occurs if volume exceeds the average.",
+            exit: "Exits all positions when the 'Fast' SMA crosses below the 'Slow' SMA (Death Cross), signaling a trend reversal.",
+            tip: "Commonly used pairs are 50/200 for long-term trends or 20/50 for medium-term. Use the Volume Filter to avoid weak signals.",
+            keyPoints: [
+                "Golden Cross / Death Cross signals",
+                "Percentage-based position sizing",
+                "Optional Volume confirmation filter"
+            ]
+        },
+        parameters: [
+            {
+                key: 'fastPeriod',
+                label: 'Fast SMA Period',
+                min: 5,
+                max: 100,
+                step: 1,
+                unit: '',
+                defaultValue: 50,
+            },
+            {
+                key: 'slowPeriod',
+                label: 'Slow SMA Period',
+                min: 20,
+                max: 500,
+                step: 5,
+                unit: '',
+                defaultValue: 200,
+            },
+            {
+                key: 'trailingStopPercent',
+                label: 'Trailing Stop',
+                min: 0,
+                max: 20,
+                step: 0.5,
+                unit: '%',
+                defaultValue: 0,
+            },
+            {
+                key: 'usePriceCross',
+                label: 'Signal Mode (0=SMA, 1=Price)',
+                min: 0,
+                max: 1,
+                step: 1,
+                unit: '',
+                defaultValue: 1,
+            },
+            {
+                key: 'exitBufferPercent',
+                label: 'Exit Buffer (Below Fast SMA)',
+                min: 0,
+                max: 10,
+                step: 0.1,
+                unit: '%',
+                defaultValue: 1,
+            },
+        ],
     }
 ];

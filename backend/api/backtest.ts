@@ -14,10 +14,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const params: StrategyParams = {
             symbol: validateSymbol(req.body.symbol || 'SOFI'),
             initialBalance: validateBalance(req.body.initialBalance || '10000'),
-            startDate: validateDate(req.body.startDate || '2022-01-01'),
-            endDate: validateDate(req.body.endDate || '2099-12-31'),
-            strategyType: req.body.strategyType || 'grid_trading',
-            strategyParams: req.body.strategyParams || {}
+            startDate: validateDate(req.body.startDate || '2024-10-01'),
+            endDate: validateDate(req.body.endDate || '2025-02-28'),
+            strategyType: req.body.strategyType || 'sma_crossover',
+            strategyParams: req.body.strategyParams || {},
+            timeframe: req.body.timeframe || '1m'
         };
 
         console.log('Running backtest with params:', params);
