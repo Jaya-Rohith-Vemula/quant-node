@@ -1,11 +1,13 @@
 export interface StrategyParameter {
     key: string;
     label: string;
-    min: number;
-    max: number;
-    step: number;
-    unit: string;
+    min?: number;
+    max?: number;
+    step?: number;
+    unit?: string;
     defaultValue: any;
+    type?: 'slider' | 'select' | 'toggle';
+    options?: { label: string; value: any }[];
 }
 
 export interface StrategyGuideMetadata {
@@ -115,30 +117,31 @@ export const STRATEGIES: Strategy[] = [
     {
         id: 'sma_crossover',
         name: 'SMA Crossover',
-        description: 'A classic trend-following strategy that triggers buy/sell signals when a short-term moving average crosses a long-term one.',
+        description: 'A simplified trend-following strategy that uses two moving averages as a floor and ceiling for price action.',
         guide: {
-            entry: "Enters a long position when the 'Fast' SMA crosses above the 'Slow' SMA (Golden Cross). If Volume Filter is enabled, entry only occurs if volume exceeds the average.",
-            exit: "Exits all positions when the 'Fast' SMA crosses below the 'Slow' SMA (Death Cross), signaling a trend reversal.",
-            tip: "Commonly used pairs are 50/200 for long-term trends or 20/50 for medium-term. Use the Volume Filter to avoid weak signals.",
+            entry: "Enters when price crosses over EITHER SMA. Includes an automatic Multi-Timeframe (MTF) filter. If 'Bullish Alignment' is enabled, Fast SMA entries are blocked unless Fast > Slow SMA.",
+            exit: "Exits if price drops below EITHER SMA, triggers a Trailing Stop, or (optionally) forced at market close.",
+            tip: "The Force EOD Exit ensures you never hold a position overnight, protecting you from overnight gaps.",
             keyPoints: [
-                "Golden Cross / Death Cross signals",
-                "Percentage-based position sizing",
-                "Optional Volume confirmation filter"
+                "Optional Force EOD Exit (Intraday)",
+                "Trailing Stop & SMA crossovers",
+                "Automatic Multi-Timeframe Trend filter",
+                "Bullish SMA Alignment safety"
             ]
         },
         parameters: [
             {
                 key: 'fastPeriod',
-                label: 'Fast SMA Period',
+                label: 'Fast Window (Signal)',
                 min: 5,
                 max: 100,
                 step: 1,
                 unit: '',
-                defaultValue: 50,
+                defaultValue: 20,
             },
             {
                 key: 'slowPeriod',
-                label: 'Slow SMA Period',
+                label: 'Slow Window (Macro)',
                 min: 20,
                 max: 500,
                 step: 5,
@@ -146,32 +149,62 @@ export const STRATEGIES: Strategy[] = [
                 defaultValue: 200,
             },
             {
+                key: 'marketHoursOnly',
+                label: 'Market Hours Only',
+                type: 'toggle',
+                defaultValue: 1,
+            },
+            {
+                key: 'forceEodExit',
+                label: 'Force EOD Exit (Intraday)',
+                type: 'toggle',
+                defaultValue: 0,
+            },
+            {
+                key: 'bullishAlignmentFilter',
+                label: 'Require Bullish Alignment',
+                type: 'toggle',
+                defaultValue: 1,
+            },
+            {
+                key: 'htfTimeframe',
+                label: 'Trend Filter 1',
+                type: 'select',
+                defaultValue: 'auto',
+                options: [
+                    { label: 'Auto (Recommended)', value: 'auto' },
+                    { label: '5 Minute', value: '5m' },
+                    { label: '15 Minute', value: '15m' },
+                    { label: '1 Hour', value: '1h' },
+                    { label: '4 Hour', value: '4h' },
+                    { label: '1 Day', value: '1d' },
+                    { label: 'Disabled (No Filter)', value: 'none' }
+                ]
+            },
+            {
+                key: 'htfTimeframe2',
+                label: 'Trend Filter 2',
+                type: 'select',
+                defaultValue: 'none',
+                options: [
+                    { label: 'Auto', value: 'auto' },
+                    { label: '5 Minute', value: '5m' },
+                    { label: '15 Minute', value: '15m' },
+                    { label: '1 Hour', value: '1h' },
+                    { label: '4 Hour', value: '4h' },
+                    { label: '1 Day', value: '1d' },
+                    { label: 'Disabled (No Filter)', value: 'none' }
+                ]
+            },
+            {
                 key: 'trailingStopPercent',
-                label: 'Trailing Stop',
+                label: 'Trailing Stop Loss',
                 min: 0,
                 max: 20,
                 step: 0.5,
                 unit: '%',
-                defaultValue: 0,
-            },
-            {
-                key: 'usePriceCross',
-                label: 'Signal Mode (0=SMA, 1=Price)',
-                min: 0,
-                max: 1,
-                step: 1,
-                unit: '',
-                defaultValue: 1,
-            },
-            {
-                key: 'exitBufferPercent',
-                label: 'Exit Buffer (Below Fast SMA)',
-                min: 0,
-                max: 10,
-                step: 0.1,
-                unit: '%',
-                defaultValue: 1,
-            },
+                defaultValue: 3,
+            }
         ],
     }
 ];

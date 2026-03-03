@@ -256,18 +256,65 @@ export function Sidebar({ params, loading, availableSymbols = [], symbolsLoading
                     onChange={(v) => onParamChange('initialBalance', v)}
                 />
 
-                {STRATEGIES.find(s => s.id === params.strategyType)?.parameters.map((p) => (
-                    <ParameterSlider
-                        key={p.key}
-                        label={p.label}
-                        value={params.strategyParams[p.key] ?? p.defaultValue}
-                        min={p.min}
-                        max={p.max}
-                        step={p.step}
-                        unit={p.unit}
-                        onChange={(v) => onParamChange(`strategyParams.${p.key}`, v)}
-                    />
-                ))}
+                {STRATEGIES.find(s => s.id === params.strategyType)?.parameters.map((p) => {
+                    const value = params.strategyParams[p.key] ?? p.defaultValue;
+
+                    if (p.type === 'select' && p.options) {
+                        return (
+                            <div key={p.key} className="space-y-1 mb-4">
+                                <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">{p.label}</label>
+                                <Select
+                                    value={value}
+                                    onValueChange={(val) => onParamChange(`strategyParams.${p.key}`, val)}
+                                >
+                                    <SelectTrigger className="w-full bg-secondary/50 border border-border h-10 text-xs font-mono mb-2 focus:ring-1 focus:ring-primary text-foreground">
+                                        <SelectValue placeholder={`Select ${p.label}`} />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-popover border-border">
+                                        {p.options.map((opt) => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        );
+                    }
+
+                    if (p.type === 'toggle') {
+                        return (
+                            <div key={p.key} className="space-y-1 mb-4">
+                                <label className="text-[12px] text-muted-foreground uppercase font-bold px-1 font-mono tracking-tight">{p.label}</label>
+                                <Select
+                                    value={value.toString()}
+                                    onValueChange={(val) => onParamChange(`strategyParams.${p.key}`, parseInt(val))}
+                                >
+                                    <SelectTrigger className="w-full bg-secondary/50 border border-border h-10 text-xs font-mono mb-2 focus:ring-1 focus:ring-primary text-foreground text-left">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-popover border-border">
+                                        <SelectItem value="1">Enabled</SelectItem>
+                                        <SelectItem value="0">Disabled</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <ParameterSlider
+                            key={p.key}
+                            label={p.label}
+                            value={value}
+                            min={p.min ?? 0}
+                            max={p.max ?? 100}
+                            step={p.step ?? 1}
+                            unit={p.unit ?? ''}
+                            onChange={(v) => onParamChange(`strategyParams.${p.key}`, v)}
+                        />
+                    );
+                })}
 
                 <button
                     onClick={onRunBacktest}

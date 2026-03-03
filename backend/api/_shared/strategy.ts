@@ -289,6 +289,35 @@ export async function runBacktest(params: StrategyParams) {
     const moveDownDecimal = moveDownPercent / 100;
     const moveUpDecimal = moveUpPercent / 100;
 
+    // --- INTRADAY CONTROLS ---
+    const isIntradayLegacy = strategyParams.intradayExit === 1;
+
+    // Explicit new params (if defined) take precedence over legacy fallback
+    const useMarketHoursOnly = strategyParams.marketHoursOnly !== undefined
+        ? strategyParams.marketHoursOnly === 1
+        : (strategyType === 'sma_crossover' ? true : isIntradayLegacy);
+
+    const useForceEodExit = strategyParams.forceEodExit !== undefined
+        ? strategyParams.forceEodExit === 1
+        : isIntradayLegacy;
+
+    const isMarketHoursOnly = useMarketHoursOnly &&
+        timeframe !== '1d' && timeframe !== '1-day' && timeframe !== 'Daily';
+
+    const isEodExitActive = useForceEodExit &&
+        timeframe !== '1d' && timeframe !== '1-day' && timeframe !== 'Daily';
+
+    // --- MARKET HOURS FILTERING (EARLY) ---
+    // If Market Hours Only is ON, we strip out all non-market-hour data before calculating indicators/SMAs.
+    if (isMarketHoursOnly) {
+        console.log(`[${new Date().toISOString()}] Filtering to market hours ONLY for indicator calculation...`);
+        rows = rows.filter(row => {
+            const timePart = row.datetime.includes(' ') ? row.datetime.split(' ')[1] : '';
+            return timePart >= '09:30' && timePart <= '16:00';
+        });
+        console.log(`[${new Date().toISOString()}] Data set reduced to ${rows.length} market-hour bars.`);
+    }
+
     // RSI Specific Setup
     const rsiPeriod = strategyParams.rsiPeriod ?? 14;
     const oversoldThreshold = strategyParams.oversoldThreshold ?? 30;
@@ -302,6 +331,92 @@ export async function runBacktest(params: StrategyParams) {
 
     const fastSMA = strategyType === 'sma_crossover' ? calculateSMA(rows.map(r => r.close), fastPeriod) : [];
     const slowSMA = strategyType === 'sma_crossover' ? calculateSMA(rows.map(r => r.close), slowPeriod) : [];
+
+    // --- MULTI-TIMEFRAME TREND FILTER ---
+    const htfTrendCombined: (boolean | null)[] = new Array(rows.length).fill(null);
+    if (strategyType === 'sma_crossover') {
+        const htfParams = [strategyParams.htfTimeframe, strategyParams.htfTimeframe2];
+        const activeHTFs: string[] = [];
+
+        for (const p of htfParams) {
+            if (p === 'auto') {
+                if (timeframe === '1m' || timeframe === '1-minute') activeHTFs.push('5m');
+                else if (timeframe === '5m') activeHTFs.push('15m');
+                else if (timeframe === '15m') activeHTFs.push('1h');
+                else if (timeframe === '1h' || timeframe === 'hourly') activeHTFs.push('1d');
+            } else if (p && p !== 'none') {
+                activeHTFs.push(p);
+            }
+        }
+
+        const uniqueHTFs = [...new Set(activeHTFs)];
+
+        // Initialize as true, if any filter is false, it becomes false
+        const htfBoolMatrix: boolean[][] = [];
+
+        for (const htf of uniqueHTFs) {
+            console.log(`[${new Date().toISOString()}] Building HTF Trend Filter (${timeframe} -> ${htf})...`);
+
+            const getHTFKey = (datetime: string, tf: string) => {
+                const dt = new Date(datetime.includes('T') ? datetime : datetime.replace(' ', 'T'));
+                if (tf === '1d') return format(dt, 'yyyy-MM-dd');
+                if (tf === '1h') { dt.setMinutes(0, 0, 0); return format(dt, 'yyyy-MM-dd HH:mm'); }
+                if (tf === '4h') {
+                    const h = dt.getHours();
+                    dt.setHours(Math.floor(h / 4) * 4, 0, 0, 0);
+                    return format(dt, 'yyyy-MM-dd HH:mm');
+                }
+                if (tf.endsWith('m')) {
+                    const mins = parseInt(tf);
+                    dt.setMinutes(Math.floor(dt.getMinutes() / mins) * mins, 0, 0);
+                    return format(dt, 'yyyy-MM-dd HH:mm');
+                }
+                return datetime;
+            };
+
+            const htfBars: any[] = [];
+            let currentHTF: any = null;
+            for (const r of rows) {
+                const key = getHTFKey(r.datetime, htf);
+                if (!currentHTF || currentHTF.datetime !== key) {
+                    if (currentHTF) htfBars.push(currentHTF);
+                    currentHTF = { datetime: key, close: r.close };
+                } else {
+                    currentHTF.close = r.close;
+                }
+            }
+            if (currentHTF) htfBars.push(currentHTF);
+
+            const htfFastSMA = calculateSMA(htfBars.map(b => b.close), fastPeriod);
+            const currentHTFBools: boolean[] = new Array(rows.length).fill(true);
+
+            let htfIdx = 0;
+            for (let i = 0; i < rows.length; i++) {
+                const key = getHTFKey(rows[i].datetime, htf);
+                while (htfIdx < htfBars.length && htfBars[htfIdx].datetime < key) {
+                    htfIdx++;
+                }
+
+                if (htfIdx > 0) {
+                    const lastBar = htfBars[htfIdx - 1];
+                    const lastSMA = htfFastSMA[htfIdx - 1];
+                    if (lastSMA !== null) {
+                        currentHTFBools[i] = lastBar.close > lastSMA;
+                    }
+                }
+            }
+            htfBoolMatrix.push(currentHTFBools);
+        }
+
+        // Combine results: Entry only if ALL active filters are bullish
+        for (let i = 0; i < rows.length; i++) {
+            if (uniqueHTFs.length > 0) {
+                htfTrendCombined[i] = htfBoolMatrix.every(m => m[i] === true);
+            } else {
+                htfTrendCombined[i] = true;
+            }
+        }
+    }
 
     const get7DayHigh = (currentDateISO: string) => {
         const currentDate = parseISO(currentDateISO);
@@ -320,6 +435,29 @@ export async function runBacktest(params: StrategyParams) {
         const currentHigh = row.high;
         const currentTime = row.datetime;
         const rowDate = row.date;
+        const timePart = currentTime.includes(' ') ? currentTime.split(' ')[1] : '';
+
+        // --- INTRADAY CONTROLS (ENFORCEMENT) ---
+        const isBuyWindow = timePart >= '09:30' && timePart < '15:45';
+
+        let shouldForceEodSell = false;
+        if (isEodExitActive) {
+            // Determine the "last bar" to sell on based on resolution
+            const is1m = timeframe === '1m' || timeframe === '1-minute';
+            const is5m = timeframe === '5m';
+            const is15m = timeframe === '15m';
+            const is1h = timeframe === '1h' || timeframe === 'hourly' || timeframe === '60m';
+
+            if (is1m || is5m) {
+                shouldForceEodSell = timePart >= '15:55';
+            } else if (is15m) {
+                shouldForceEodSell = timePart >= '15:45';
+            } else if (is1h) {
+                shouldForceEodSell = timePart >= '15:00';
+            } else {
+                shouldForceEodSell = timePart >= '15:55'; // Fallback
+            }
+        }
 
         // Skip simulation before the actual requested start date (these were just for indicator buffer)
         if (currentTime < startDate) {
@@ -377,6 +515,9 @@ export async function runBacktest(params: StrategyParams) {
         let sellReason = '';
         let sellLots: Position[] = [];
 
+        const prevPrice = i > 0 ? rows[i - 1].close : null;
+
+
         if (strategyType === 'grid_trading') {
             // SELL LOGIC (Grid)
             for (const pos of openPositions) {
@@ -430,27 +571,29 @@ export async function runBacktest(params: StrategyParams) {
             const prevFast = i > 0 ? fastSMA[i - 1] : null;
             const prevSlow = i > 0 ? slowSMA[i - 1] : null;
 
-            const usePriceCross = strategyParams.usePriceCross === 1;
-            const exitBuffer = (strategyParams.exitBufferPercent ?? 0) / 100;
-
-            if (currentFast !== null && currentSlow !== null) {
-                // --- SELL LOGIC ---
+            if (currentFast !== null && currentSlow !== null && prevFast !== null && prevSlow !== null && prevPrice !== null) {
+                // --- SELL logic ---
                 if (openPositions.length > 0) {
+                    const droppedFast = prevPrice >= prevFast && currentPrice < currentFast;
+                    const droppedSlow = prevPrice >= prevSlow && currentPrice < currentSlow;
+
                     let triggered = false;
                     let reason = '';
 
-                    if (usePriceCross) {
-                        // Speed Mode: Exit if price drops below Fast SMA with a buffer
-                        const exitThreshold = currentFast * (1 - exitBuffer);
-                        if (currentPrice < exitThreshold) {
-                            triggered = true;
-                            reason = `Price (${currentPrice.toFixed(2)}) < Fast SMA Buffer (${exitThreshold.toFixed(2)})`;
-                        }
-                    } else if (prevFast !== null && prevSlow !== null) {
-                        // Classic Mode: Death Cross
-                        if (currentFast < currentSlow && prevFast >= prevSlow) {
-                            triggered = true;
-                            reason = `SMA Death Cross: Fast (${currentFast.toFixed(4)}) < Slow (${currentSlow.toFixed(4)})`;
+                    if (droppedFast || droppedSlow) {
+                        triggered = true;
+                        reason = `Exit: Price crossed below ${droppedFast ? 'Fast' : 'Slow'} SMA`;
+                    } else {
+                        // Check Trailing Stop
+                        const stopPercent = strategyParams.trailingStopPercent ?? 0;
+                        if (stopPercent > 0) {
+                            for (const pos of openPositions) {
+                                if (currentPrice <= pos.peakPrice * (1 - stopPercent / 100)) {
+                                    triggered = true;
+                                    reason = `Trailing Stop: Price dropped ${stopPercent}% from peak ($${pos.peakPrice.toFixed(2)})`;
+                                    break;
+                                }
+                            }
                         }
                     }
 
@@ -458,44 +601,49 @@ export async function runBacktest(params: StrategyParams) {
                         shouldSell = true;
                         sellLots = [...openPositions];
                         sellReason = reason;
+                    } else if (shouldForceEodSell) {
+                        shouldSell = true;
+                        sellLots = [...openPositions];
+                        sellReason = 'Forced Intraday EOD Exit';
                     }
                 }
 
-                // --- BUY LOGIC ---
-                if (openPositions.length < 1) {
-                    if (usePriceCross) {
-                        // Speed Mode: Price crosses Fast SMA, with Slow SMA as a long-term filter
-                        if (currentPrice > currentFast && currentPrice > currentSlow) {
-                            shouldBuy = true;
-                            buyReason = `Price (${currentPrice.toFixed(2)}) > Fast SMA (${currentFast.toFixed(2)}) & Slow SMA (${currentSlow.toFixed(2)})`;
+                // --- BUY logic ---
+                if (openPositions.length < 1 && !shouldForceEodSell && isBuyWindow) {
+                    const crossedFastUp = prevPrice <= prevFast && currentPrice > currentFast;
+                    const crossedSlowUp = prevPrice <= prevSlow && currentPrice > currentSlow;
+
+                    const isTrendBullishHTF = htfTrendCombined[i] !== false;
+                    const useBullishFilter = strategyParams.bullishAlignmentFilter === 1;
+
+                    let buyTriggered = false;
+                    let triggerType = '';
+
+                    // Slow SMA is a "good sign", always allowed
+                    if (crossedSlowUp) {
+                        buyTriggered = true;
+                        triggerType = 'Slow SMA';
+                    } else if (crossedFastUp) {
+                        // Fast SMA entry requires filter check
+                        if (!useBullishFilter || currentFast > currentSlow) {
+                            buyTriggered = true;
+                            triggerType = 'Fast SMA';
                         }
-                    } else if (prevFast !== null && prevSlow !== null) {
-                        // Classic Mode: Golden Cross
-                        if (currentFast > currentSlow) {
-                            shouldBuy = true;
-                            buyReason = `SMA Trend: Fast (${currentFast.toFixed(4)}) > Slow (${currentSlow.toFixed(4)})`;
-                        }
+                    }
+
+                    if (buyTriggered && isTrendBullishHTF) {
+                        shouldBuy = true;
+                        buyReason = `Entry: Price break above ${triggerType} (Alignment: ${useBullishFilter ? (currentFast > currentSlow ? 'Golden' : 'Open') : 'Ignored'})`;
                     }
                 }
             }
         }
 
-        // --- TRAILING STOP LOSS CHECK ---
-        if (trailingStopPercent > 0 && openPositions.length > 0) {
-            const stopMultiplier = 1 - (trailingStopPercent / 100);
+        // --- TRAILING STOP LOSS UPDATE (ALWAYS ACTIVE FOR PERFORMANCE) ---
+        if (openPositions.length > 0) {
             for (const pos of openPositions) {
-                // Update peak price if current price is higher
                 if (currentPrice > pos.peakPrice) {
                     pos.peakPrice = currentPrice;
-                }
-
-                // Check trailing stop condition (if not already selling by other logic)
-                if (!sellLots.find(p => p.id === pos.id)) {
-                    if (currentPrice <= pos.peakPrice * stopMultiplier) {
-                        shouldSell = true;
-                        sellReason = `Trailing Stop: Price (${currentPrice.toFixed(2)}) dropped below ${trailingStopPercent}% from peak (${pos.peakPrice.toFixed(2)})`;
-                        sellLots.push(pos);
-                    }
                 }
             }
         }

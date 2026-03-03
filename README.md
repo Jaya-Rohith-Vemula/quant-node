@@ -49,7 +49,19 @@ npm run dev
 
 ---
 
+---
+
+## 📘 Strategy Guides
+
+Detailed breakdowns of specific trading modes and logic explanations:
+
+-   [**SMA Crossover: Price Signal Mode**](./SMA_Crossover_Price_Signal_Guide.md) - Learn how "Speed Mode" reacts to price breakouts vs. SMAs.
+-   [**Supertrend Strategy**](./Supertrend_Guide.md) - Understanding volatility-based trend following.
+
+---
+
 ## 🏗 Adding New Strategies
+
 
 Quant Node is built to be "plug-and-play." To add a new strategy:
 
