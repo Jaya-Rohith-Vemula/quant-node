@@ -131,7 +131,8 @@ export async function runBacktest(params: StrategyParams) {
     const fastPeriodReq = strategyParams.fastPeriod ?? 50;
     const slowPeriodReq = strategyParams.slowPeriod ?? 200;
     const rsiPeriodReq = strategyParams.rsiPeriod ?? 14;
-    const maxPeriod = Math.max(fastPeriodReq, slowPeriodReq, rsiPeriodReq);
+    const amrTrendEMA = strategyParams.trendEMA ?? 50;
+    const maxPeriod = Math.max(fastPeriodReq, slowPeriodReq, rsiPeriodReq, amrTrendEMA);
 
     let queryStartDate = startDate;
     if (maxPeriod > 0) {
@@ -322,7 +323,7 @@ export async function runBacktest(params: StrategyParams) {
     const rsiPeriod = strategyParams.rsiPeriod ?? 14;
     const oversoldThreshold = strategyParams.oversoldThreshold ?? 30;
     const overboughtThreshold = strategyParams.overboughtThreshold ?? 70;
-    const rsiValues = strategyType === 'rsi_mean_reversion' ? calculateRSI(rows.map(r => r.close), rsiPeriod) : [];
+    const rsiValues = (strategyType === 'rsi_mean_reversion' || strategyType === 'amr') ? calculateRSI(rows.map(r => r.close), rsiPeriod) : [];
 
     // SMA Specific Setup
     const fastPeriod = strategyParams.fastPeriod ?? 50;
@@ -331,6 +332,56 @@ export async function runBacktest(params: StrategyParams) {
 
     const fastSMA = strategyType === 'sma_crossover' ? calculateSMA(rows.map(r => r.close), fastPeriod) : [];
     const slowSMA = strategyType === 'sma_crossover' ? calculateSMA(rows.map(r => r.close), slowPeriod) : [];
+
+    // --- AMR (Adaptive Momentum Rider) Setup ---
+    const amrFastEMAPeriod = strategyParams.fastEMA ?? 8;
+    const amrSlowEMAPeriod = strategyParams.slowEMA ?? 21;
+    const amrTrendEMAPeriod = strategyParams.trendEMA ?? 50;
+    const amrTrendTrailATR = strategyParams.trendTrailATR ?? 2.5;
+    const amrChoppyTrailATR = strategyParams.choppyTrailATR ?? 1.5;
+    const amrSlopeThreshold = strategyParams.trendSlopeThreshold ?? 0.1;
+    const amrRSIFloor = strategyParams.rsiFloor ?? 35;
+    const amrRSICeiling = strategyParams.rsiCeiling ?? 75;
+    const amrReentryBars = strategyParams.reentryBars ?? 3;
+    const amrATRPeriod = strategyParams.atrPeriod ?? 14;
+
+    const closePrices = rows.map(r => r.close);
+    const amrFastEMA = strategyType === 'amr' ? calculateEMA(closePrices, amrFastEMAPeriod) : [];
+    const amrSlowEMA = strategyType === 'amr' ? calculateEMA(closePrices, amrSlowEMAPeriod) : [];
+    const amrTrendEMAValues = strategyType === 'amr' ? calculateEMA(closePrices, amrTrendEMAPeriod) : [];
+
+    // ATR calculation for AMR
+    const amrATR: (number | null)[] = [];
+    if (strategyType === 'amr') {
+        const trs: number[] = [0];
+        for (let ri = 1; ri < rows.length; ri++) {
+            trs.push(Math.max(
+                rows[ri].high - rows[ri].low,
+                Math.abs(rows[ri].high - rows[ri - 1].close),
+                Math.abs(rows[ri].low - rows[ri - 1].close)
+            ));
+        }
+        for (let ri = 0; ri < amrATRPeriod; ri++) amrATR.push(null);
+        let atrSum = trs.slice(1, amrATRPeriod + 1).reduce((a, b) => a + b, 0);
+        amrATR.push(atrSum / amrATRPeriod);
+        for (let ri = amrATRPeriod + 1; ri < rows.length; ri++) {
+            const prev = amrATR[ri - 1]!;
+            amrATR.push((prev * (amrATRPeriod - 1) + trs[ri]) / amrATRPeriod);
+        }
+    }
+
+    // EMA slope for regime detection (5-bar slope of trend EMA as %)
+    const amrTrendSlope: number[] = strategyType === 'amr'
+        ? amrTrendEMAValues.map((v, idx) => {
+            if (idx < 5 || v == null) return 0;
+            const prev = amrTrendEMAValues[idx - 5];
+            if (prev == null || prev === 0) return 0;
+            return ((v - prev) / prev) * 100;
+        })
+        : [];
+
+    let amrBarsSinceExit = 999;
+    let amrEntryATR = 0;
 
     // --- MULTI-TIMEFRAME TREND FILTER ---
     const htfTrendCombined: (boolean | null)[] = new Array(rows.length).fill(null);
@@ -438,7 +489,8 @@ export async function runBacktest(params: StrategyParams) {
         const timePart = currentTime.includes(' ') ? currentTime.split(' ')[1] : '';
 
         // --- INTRADAY CONTROLS (ENFORCEMENT) ---
-        const isBuyWindow = timePart >= '09:30' && timePart < '15:45';
+        const isDaily = timeframe === '1d' || timeframe === '1-day' || timeframe === 'Daily';
+        const isBuyWindow = isDaily || timePart === '' || (timePart >= '09:30' && timePart < '15:45');
 
         let shouldForceEodSell = false;
         if (isEodExitActive) {
@@ -637,6 +689,122 @@ export async function runBacktest(params: StrategyParams) {
                     }
                 }
             }
+        } else if (strategyType === 'amr') {
+            // === ADAPTIVE MOMENTUM RIDER (AMR) v2 ===
+            const curFastEMA = amrFastEMA[i];
+            const curSlowEMA = amrSlowEMA[i];
+            const curTrendEMA = amrTrendEMAValues[i];
+            const prevFastEMA = i > 0 ? amrFastEMA[i - 1] : null;
+            const prevSlowEMA = i > 0 ? amrSlowEMA[i - 1] : null;
+            const prevTrendEMA = i > 0 ? amrTrendEMAValues[i - 1] : null;
+            const curATR = amrATR[i];
+            const curRSI = rsiValues[i];
+            const curSlope = amrTrendSlope[i];
+
+            if (curFastEMA != null && curSlowEMA != null && curTrendEMA != null &&
+                prevFastEMA != null && prevSlowEMA != null && prevTrendEMA != null &&
+                curATR != null && curRSI != null && prevPrice != null) {
+
+                // === ADAPTIVE REGIME DETECTION ===
+                // Measure trend strength as a continuous variable, not binary
+                const absSlope = Math.abs(curSlope);
+                const isTrending = absSlope > amrSlopeThreshold;
+                const isStrongTrend = absSlope > amrSlopeThreshold * 3; // Parabolic
+                const isModerateTrend = absSlope > amrSlopeThreshold * 1.5;
+
+                // ATR as percentage of price — normalizes across price levels
+                const atrPercent = (curATR / currentPrice) * 100;
+
+                // Dynamic trail multiplier that SCALES with trend strength
+                // Base: choppy=1.5x, trend=2.5x
+                // In strong trends: boost by up to 1.5x extra (so 2.5 * 1.5 = 3.75x)
+                let dynamicTrailMult: number;
+                if (isStrongTrend) {
+                    dynamicTrailMult = amrTrendTrailATR * 1.5; // Extra wide for parabolic
+                } else if (isModerateTrend) {
+                    dynamicTrailMult = amrTrendTrailATR * 1.2;
+                } else if (isTrending) {
+                    dynamicTrailMult = amrTrendTrailATR;
+                } else {
+                    dynamicTrailMult = amrChoppyTrailATR;
+                }
+
+                // --- SELL logic (AMR v2 — Adaptive Exit) ---
+                if (openPositions.length > 0) {
+                    let exitReason = '';
+                    const pos = openPositions[0];
+
+                    // How much are we up or down on this position?
+                    const unrealizedPct = ((currentPrice - pos.buyPrice) / pos.buyPrice) * 100;
+                    // Are the EMAs still bullishly aligned?
+                    const emasBullish = curFastEMA > curSlowEMA;
+
+                    // 1. PERCENTAGE-BASED ATR Trailing Stop — ALWAYS ACTIVE
+                    // Primary exit in ALL regimes. Scales with price level via ATR%
+                    const trailPercent = dynamicTrailMult * atrPercent / 100;
+                    const trailingStop = pos.peakPrice * (1 - trailPercent);
+                    if (currentPrice < trailingStop) {
+                        exitReason = `ATR Trail Stop (${(trailPercent * 100).toFixed(1)}% from peak $${pos.peakPrice.toFixed(2)}, regime=${isStrongTrend ? 'STRONG' : isTrending ? 'TREND' : 'CHOPPY'})`;
+                    }
+
+                    // 2. Trend EMA break — ONLY when EMA structure is bearish AND losing
+                    // In strong trends: completely suppressed (parabolic pullbacks are normal)
+                    // In trends with profit: suppressed (trailing stop protects us)
+                    if (!exitReason && !emasBullish && unrealizedPct < 0 && !isStrongTrend) {
+                        if (currentPrice < curTrendEMA && prevPrice >= prevTrendEMA) {
+                            exitReason = `Trend Break (bearish EMA, loss=${unrealizedPct.toFixed(1)}%)`;
+                        }
+                    }
+
+                    // 3. Death cross — ONLY when materially losing AND not trending
+                    if (!exitReason && unrealizedPct < -2 && !isTrending) {
+                        if (curFastEMA < curSlowEMA && prevFastEMA >= prevSlowEMA) {
+                            exitReason = `Death Cross (loss=${unrealizedPct.toFixed(1)}%)`;
+                        }
+                    }
+
+                    if (exitReason) {
+                        shouldSell = true;
+                        sellLots = [...openPositions];
+                        sellReason = exitReason;
+                        amrBarsSinceExit = 0;
+                    } else if (shouldForceEodSell) {
+                        shouldSell = true;
+                        sellLots = [...openPositions];
+                        sellReason = 'Forced Intraday EOD Exit';
+                        amrBarsSinceExit = 0;
+                    }
+                }
+
+                // --- BUY logic (AMR v2) ---
+                if (openPositions.length < 1 && !shouldForceEodSell && isBuyWindow) {
+                    amrBarsSinceExit++;
+
+                    // 1. EMA golden cross: fast crosses above slow
+                    const crossUp = curFastEMA > curSlowEMA && prevFastEMA <= prevSlowEMA;
+                    // 2. Reclaim entry: price reclaims fast EMA while EMAs still bullish
+                    const reclaimEntry = curFastEMA > curSlowEMA &&
+                        prevPrice < prevFastEMA &&
+                        currentPrice > curFastEMA &&
+                        currentPrice > curTrendEMA &&
+                        amrBarsSinceExit >= 5;
+
+                    // 3. Trend filter: price above trend EMA
+                    const trendOk = currentPrice > curTrendEMA;
+                    // 4. RSI filter: not overbought or oversold
+                    const rsiOk = curRSI >= amrRSIFloor && curRSI <= amrRSICeiling;
+                    // 5. Cooldown check
+                    const cooldownOk = amrBarsSinceExit >= amrReentryBars;
+
+                    if ((crossUp || reclaimEntry) && trendOk && rsiOk && cooldownOk) {
+                        shouldBuy = true;
+                        const entryType = crossUp ? 'Golden Cross' : 'EMA Reclaim';
+                        const regime = isStrongTrend ? 'STRONG' : isTrending ? 'TREND' : 'CHOPPY';
+                        buyReason = `${entryType} (RSI=${curRSI.toFixed(0)}, Regime=${regime}, Trail=${dynamicTrailMult.toFixed(1)}x ATR)`;
+                        amrEntryATR = curATR;
+                    }
+                }
+            }
         }
 
         // --- TRAILING STOP LOSS UPDATE (ALWAYS ACTIVE FOR PERFORMANCE) ---
@@ -691,6 +859,8 @@ export async function runBacktest(params: StrategyParams) {
             amountToBuy = initialBalance * 0.1;
         } else if (strategyType === 'sma_crossover') {
             amountToBuy = currentBalance;
+        } else if (strategyType === 'amr') {
+            amountToBuy = currentBalance; // Full position sizing (all-in, all-out)
         }
 
         if (shouldBuy && currentBalance >= amountToBuy && amountToBuy > 0) {

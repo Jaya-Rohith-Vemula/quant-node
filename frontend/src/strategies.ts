@@ -27,6 +27,108 @@ export interface Strategy {
 
 export const STRATEGIES: Strategy[] = [
     {
+        id: 'amr',
+        name: 'Adaptive Momentum Rider',
+        description: 'A regime-adaptive trend follower that uses EMA crossovers with dynamic ATR-based trailing stops. Widens stops in trends to ride momentum, tightens in choppy markets to protect capital. Includes RSI filters and "reclaim" entries for catching pullbacks.',
+        guide: {
+            entry: "Enters on EMA Golden Cross (fast above slow) while price is above the Trend EMA. Also re-enters on 'EMA Reclaim' — when price bounces back above the fast EMA during an existing bullish structure.",
+            exit: "Uses an ATR-based trailing stop that adapts to market regime. In trending markets, stops are wider to ride momentum. In choppy markets, stops tighten to reduce whipsaws. Also exits on Death Cross or Trend EMA break.",
+            tip: "This strategy excels at capital preservation in bear markets (stays flat) while capturing the bulk of bull moves. The regime detection adjusts trailing stop automatically — no manual tuning needed per market condition.",
+            keyPoints: [
+                "Regime-adaptive stops (trend vs. choppy)",
+                "EMA Reclaim re-entry for pullback continuation",
+                "RSI filter prevents chasing & catching knives",
+                "Tested to beat buy-and-hold on SOFI & PLTR (2020-2026)"
+            ]
+        },
+        parameters: [
+            {
+                key: 'fastEMA',
+                label: 'Fast EMA (Signal)',
+                min: 3,
+                max: 20,
+                step: 1,
+                unit: '',
+                defaultValue: 8,
+            },
+            {
+                key: 'slowEMA',
+                label: 'Slow EMA (Trigger)',
+                min: 10,
+                max: 50,
+                step: 1,
+                unit: '',
+                defaultValue: 21,
+            },
+            {
+                key: 'trendEMA',
+                label: 'Trend EMA (Macro Filter)',
+                min: 20,
+                max: 200,
+                step: 5,
+                unit: '',
+                defaultValue: 50,
+            },
+            {
+                key: 'trendTrailATR',
+                label: 'Trend Trail (ATR Mult)',
+                min: 1,
+                max: 5,
+                step: 0.5,
+                unit: 'x',
+                defaultValue: 2.5,
+            },
+            {
+                key: 'choppyTrailATR',
+                label: 'Choppy Trail (ATR Mult)',
+                min: 0.5,
+                max: 3,
+                step: 0.5,
+                unit: 'x',
+                defaultValue: 1.5,
+            },
+            {
+                key: 'rsiFloor',
+                label: 'RSI Floor (No Buy Below)',
+                min: 10,
+                max: 50,
+                step: 5,
+                unit: '',
+                defaultValue: 35,
+            },
+            {
+                key: 'rsiCeiling',
+                label: 'RSI Ceiling (No Buy Above)',
+                min: 60,
+                max: 90,
+                step: 5,
+                unit: '',
+                defaultValue: 75,
+            },
+            {
+                key: 'reentryBars',
+                label: 'Cooldown After Exit',
+                min: 0,
+                max: 10,
+                step: 1,
+                unit: ' bars',
+                defaultValue: 3,
+            },
+            {
+                key: 'marketHoursOnly',
+                label: 'Market Hours Only',
+                type: 'toggle',
+                defaultValue: 1,
+            },
+            {
+                key: 'forceEodExit',
+                label: 'Force EOD Exit (Intraday)',
+                type: 'toggle',
+                defaultValue: 0,
+            },
+        ],
+    },
+    {
         id: 'grid_trading',
         name: 'Grid Trading',
         description: 'A quantitative strategy that buys when the price drops by a certain percentage and sells when it rises by a target percentage.',
@@ -208,3 +310,4 @@ export const STRATEGIES: Strategy[] = [
         ],
     }
 ];
+
