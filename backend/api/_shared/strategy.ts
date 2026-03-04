@@ -383,6 +383,77 @@ export async function runBacktest(params: StrategyParams) {
     let amrBarsSinceExit = 999;
     let amrEntryATR = 0;
 
+    // --- AMR MULTI-TIMEFRAME TREND FILTER ---
+    // Resample execution bars to a higher timeframe and compute EMA trend for entry confirmation
+    // htfConfirm: 'none'=off, '1h', '4h', '1d', or legacy 1=1h, 0=off
+    const htfConfirmRaw = strategyParams.htfConfirm ?? 'none';
+    const amrHTFTimeframe = htfConfirmRaw === 1 ? '1h' : htfConfirmRaw === 0 ? 'none' : String(htfConfirmRaw);
+    const amrHTFBullish: boolean[] = new Array(rows.length).fill(true);
+
+    if (strategyType === 'amr' && amrHTFTimeframe !== 'none') {
+        console.log(`[${new Date().toISOString()}] Building AMR HTF Trend Filter (${timeframe} -> ${amrHTFTimeframe})...`);
+
+        // Generic resampling key function for any timeframe
+        const getHTFBarKey = (datetime: string, tf: string): string => {
+            const dt = new Date(datetime.includes('T') ? datetime : datetime.replace(' ', 'T'));
+            if (tf === '1d') {
+                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+            }
+            if (tf === '4h') {
+                const h = Math.floor(dt.getHours() / 4) * 4;
+                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')} ${String(h).padStart(2, '0')}:00`;
+            }
+            if (tf === '1h') {
+                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:00`;
+            }
+            // For minute-based timeframes (15m, 30m, etc.)
+            const mins = parseInt(tf);
+            if (!isNaN(mins)) {
+                const m = Math.floor(dt.getMinutes() / mins) * mins;
+                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            }
+            // Fallback: treat as 1h
+            return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:00`;
+        };
+
+        // Resample to HTF
+        const htfBars: { datetime: string; open: number; high: number; low: number; close: number }[] = [];
+        let htfBar: any = null;
+        for (const r of rows) {
+            const key = getHTFBarKey(r.datetime, amrHTFTimeframe);
+            if (!htfBar || htfBar.datetime !== key) {
+                if (htfBar) htfBars.push(htfBar);
+                htfBar = { datetime: key, open: r.open, high: r.high, low: r.low, close: r.close };
+            } else {
+                htfBar.high = Math.max(htfBar.high, r.high);
+                htfBar.low = Math.min(htfBar.low, r.low);
+                htfBar.close = r.close;
+            }
+        }
+        if (htfBar) htfBars.push(htfBar);
+
+        // Compute EMAs on HTF bars using same periods
+        const htfCloses = htfBars.map(b => b.close);
+        const htfFastEMA = calculateEMA(htfCloses, amrFastEMAPeriod);
+        const htfSlowEMA = calculateEMA(htfCloses, amrSlowEMAPeriod);
+        const htfTrendEMA = calculateEMA(htfCloses, amrTrendEMAPeriod);
+
+        // Map HTF signal back to execution bars
+        let htfIdx = 0;
+        for (let i = 0; i < rows.length; i++) {
+            const key = getHTFBarKey(rows[i].datetime, amrHTFTimeframe);
+            // Find matching or previous HTF bar
+            while (htfIdx < htfBars.length - 1 && htfBars[htfIdx + 1].datetime <= key) {
+                htfIdx++;
+            }
+            if (htfIdx >= 0 && htfFastEMA[htfIdx] != null && htfSlowEMA[htfIdx] != null && htfTrendEMA[htfIdx] != null) {
+                // HTF is bullish when: fast EMA > slow EMA AND price above trend EMA
+                amrHTFBullish[i] = htfFastEMA[htfIdx]! > htfSlowEMA[htfIdx]! && htfCloses[htfIdx] > htfTrendEMA[htfIdx]!;
+            }
+        }
+        console.log(`[${new Date().toISOString()}] AMR HTF filter built: ${htfBars.length} ${amrHTFTimeframe} bars computed.`);
+    }
+
     // --- MULTI-TIMEFRAME TREND FILTER ---
     const htfTrendCombined: (boolean | null)[] = new Array(rows.length).fill(null);
     if (strategyType === 'sma_crossover') {
@@ -796,7 +867,10 @@ export async function runBacktest(params: StrategyParams) {
                     // 5. Cooldown check
                     const cooldownOk = amrBarsSinceExit >= amrReentryBars;
 
-                    if ((crossUp || reclaimEntry) && trendOk && rsiOk && cooldownOk) {
+                    // 6. HTF confirmation: higher timeframe must confirm bullish
+                    const htfOk = amrHTFBullish[i];
+
+                    if ((crossUp || reclaimEntry) && trendOk && rsiOk && cooldownOk && htfOk) {
                         shouldBuy = true;
                         const entryType = crossUp ? 'Golden Cross' : 'EMA Reclaim';
                         const regime = isStrongTrend ? 'STRONG' : isTrending ? 'TREND' : 'CHOPPY';
