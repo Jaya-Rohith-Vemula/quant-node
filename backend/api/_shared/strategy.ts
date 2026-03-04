@@ -344,6 +344,7 @@ export async function runBacktest(params: StrategyParams) {
     const amrRSICeiling = strategyParams.rsiCeiling ?? 75;
     const amrReentryBars = strategyParams.reentryBars ?? 3;
     const amrATRPeriod = strategyParams.atrPeriod ?? 14;
+    const amrAutoAdapt = strategyParams.autoAdapt ?? 0; // 0=off, 1=on
 
     const closePrices = rows.map(r => r.close);
     const amrFastEMA = strategyType === 'amr' ? calculateEMA(closePrices, amrFastEMAPeriod) : [];
@@ -368,6 +369,28 @@ export async function runBacktest(params: StrategyParams) {
             const prev = amrATR[ri - 1]!;
             amrATR.push((prev * (amrATRPeriod - 1) + trs[ri]) / amrATRPeriod);
         }
+    }
+
+    // --- AUTO-ADAPTIVE v2: compute continuous volatility ratio ---
+    // Instead of switching EMAs (causes noise), scale trail & cooldown dynamically
+    // volRatio[i] = current ATR% / median ATR%. >1 = high vol, <1 = low vol
+    const amrVolRatio: number[] = new Array(rows.length).fill(1.0);
+    if (strategyType === 'amr' && amrAutoAdapt === 1) {
+        const lookback = 200;
+        const atrPctHistory: number[] = [];
+        for (let ri = 0; ri < rows.length; ri++) {
+            if (amrATR[ri] != null && rows[ri].close > 0) {
+                const atrPct = (amrATR[ri]! / rows[ri].close) * 100;
+                atrPctHistory.push(atrPct);
+                const recentWindow = atrPctHistory.slice(-lookback);
+                const sorted = [...recentWindow].sort((a, b) => a - b);
+                const median = sorted[Math.floor(sorted.length / 2)];
+                // Ratio clamped between 0.5 and 2.0 to prevent extremes
+                amrVolRatio[ri] = Math.max(0.5, Math.min(2.0, median > 0 ? atrPct / median : 1.0));
+            }
+        }
+        const avgRatio = amrVolRatio.reduce((a, b) => a + b, 0) / rows.length;
+        console.log(`[${new Date().toISOString()}] Auto-Adapt v2: avg vol ratio = ${avgRatio.toFixed(2)} (1.0 = normal, >1 = high vol, <1 = low vol)`);
     }
 
     // EMA slope for regime detection (5-bar slope of trend EMA as %)
@@ -777,27 +800,30 @@ export async function runBacktest(params: StrategyParams) {
                 curATR != null && curRSI != null && prevPrice != null) {
 
                 // === ADAPTIVE REGIME DETECTION ===
-                // Measure trend strength as a continuous variable, not binary
                 const absSlope = Math.abs(curSlope);
                 const isTrending = absSlope > amrSlopeThreshold;
-                const isStrongTrend = absSlope > amrSlopeThreshold * 3; // Parabolic
+                const isStrongTrend = absSlope > amrSlopeThreshold * 3;
                 const isModerateTrend = absSlope > amrSlopeThreshold * 1.5;
 
-                // ATR as percentage of price — normalizes across price levels
+                // ATR as percentage of price
                 const atrPercent = (curATR / currentPrice) * 100;
 
-                // Dynamic trail multiplier that SCALES with trend strength
-                // Base: choppy=1.5x, trend=2.5x
-                // In strong trends: boost by up to 1.5x extra (so 2.5 * 1.5 = 3.75x)
+                // Auto-Adapt v2: scale trail multiplier with volatility ratio
+                // High vol (ratio=1.5) → wider trails, Low vol (ratio=0.7) → tighter trails
+                const volScale = amrAutoAdapt === 1 ? amrVolRatio[i] : 1.0;
+                const scaledTrendTrail = amrTrendTrailATR * volScale;
+                const scaledChoppyTrail = amrChoppyTrailATR * volScale;
+
+                // Dynamic trail multiplier: regime + volatility scaling
                 let dynamicTrailMult: number;
                 if (isStrongTrend) {
-                    dynamicTrailMult = amrTrendTrailATR * 1.5; // Extra wide for parabolic
+                    dynamicTrailMult = scaledTrendTrail * 1.5;
                 } else if (isModerateTrend) {
-                    dynamicTrailMult = amrTrendTrailATR * 1.2;
+                    dynamicTrailMult = scaledTrendTrail * 1.2;
                 } else if (isTrending) {
-                    dynamicTrailMult = amrTrendTrailATR;
+                    dynamicTrailMult = scaledTrendTrail;
                 } else {
-                    dynamicTrailMult = amrChoppyTrailATR;
+                    dynamicTrailMult = scaledChoppyTrail;
                 }
 
                 // --- SELL logic (AMR v2 — Adaptive Exit) ---
@@ -864,8 +890,9 @@ export async function runBacktest(params: StrategyParams) {
                     const trendOk = currentPrice > curTrendEMA;
                     // 4. RSI filter: not overbought or oversold
                     const rsiOk = curRSI >= amrRSIFloor && curRSI <= amrRSICeiling;
-                    // 5. Cooldown check
-                    const cooldownOk = amrBarsSinceExit >= amrReentryBars;
+                    // 5. Cooldown check — scales with volatility (high vol = longer cooldown)
+                    const scaledCooldown = amrAutoAdapt === 1 ? Math.round(amrReentryBars * volScale) : amrReentryBars;
+                    const cooldownOk = amrBarsSinceExit >= scaledCooldown;
 
                     // 6. HTF confirmation: higher timeframe must confirm bullish
                     const htfOk = amrHTFBullish[i];
@@ -874,7 +901,8 @@ export async function runBacktest(params: StrategyParams) {
                         shouldBuy = true;
                         const entryType = crossUp ? 'Golden Cross' : 'EMA Reclaim';
                         const regime = isStrongTrend ? 'STRONG' : isTrending ? 'TREND' : 'CHOPPY';
-                        buyReason = `${entryType} (RSI=${curRSI.toFixed(0)}, Regime=${regime}, Trail=${dynamicTrailMult.toFixed(1)}x ATR)`;
+                        const volInfo = amrAutoAdapt === 1 ? `, Vol=${volScale.toFixed(2)}x` : '';
+                        buyReason = `${entryType} (RSI=${curRSI.toFixed(0)}, Regime=${regime}, Trail=${dynamicTrailMult.toFixed(1)}x ATR${volInfo})`;
                         amrEntryATR = curATR;
                     }
                 }

@@ -50,7 +50,7 @@ export const STRATEGIES: Strategy[] = [
                 max: 20,
                 step: 1,
                 unit: '',
-                defaultValue: 8,
+                defaultValue: 5,
             },
             {
                 key: 'slowEMA',
@@ -59,7 +59,7 @@ export const STRATEGIES: Strategy[] = [
                 max: 50,
                 step: 1,
                 unit: '',
-                defaultValue: 21,
+                defaultValue: 13,
             },
             {
                 key: 'trendEMA',
@@ -68,7 +68,7 @@ export const STRATEGIES: Strategy[] = [
                 max: 200,
                 step: 5,
                 unit: '',
-                defaultValue: 50,
+                defaultValue: 34,
             },
             {
                 key: 'trendTrailATR',
@@ -128,6 +128,12 @@ export const STRATEGIES: Strategy[] = [
                     { label: '4 Hours', value: '4h' },
                     { label: '1 Day', value: '1d' },
                 ],
+            },
+            {
+                key: 'autoAdapt',
+                label: 'Auto-Adapt to Volatility',
+                type: 'toggle',
+                defaultValue: 1,
             },
             {
                 key: 'marketHoursOnly',
