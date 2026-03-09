@@ -174,6 +174,38 @@ export async function runBacktest(params: StrategyParams) {
     let rows = result.rows as any[];
     console.log(`[${new Date().toISOString()}] Retrieved ${rows.length} rows from OCI for ${symbol}`);
 
+    // --- EOD DIRECTIONAL: Also fetch TQQQ and SQQQ actual price data ---
+    const eodTQQQPriceMap = new Map<string, { open: number; high: number; low: number; close: number }>();
+    const eodSQQQPriceMap = new Map<string, { open: number; high: number; low: number; close: number }>();
+    if (strategyType === 'eod_directional') {
+        for (const etfSymbol of ['TQQQ', 'SQQQ']) {
+            console.log(`[${new Date().toISOString()}] Fetching ${etfSymbol} data for EOD directional execution...`);
+            try {
+                const etfResult = await conn.execute(
+                    `SELECT "datetime", "trade_date" as "date", "open", "high", "low", "close"
+                     FROM "historical"
+                     WHERE "symbol" = :symbol
+                       AND "datetime" >= :startDate
+                       AND "datetime" <= :endDate
+                     ORDER BY "datetime" ASC`,
+                    { symbol: etfSymbol, startDate: queryStartDate, endDate },
+                    { outFormat: oracledb.OUT_FORMAT_OBJECT }
+                );
+                const etfRows = etfResult.rows as any[];
+                console.log(`[${new Date().toISOString()}] Retrieved ${etfRows.length} ${etfSymbol} rows`);
+                const priceMap = etfSymbol === 'TQQQ' ? eodTQQQPriceMap : eodSQQQPriceMap;
+                for (const r of etfRows) {
+                    // Key by date for daily matching
+                    const dateKey = r.date || r.datetime.split(' ')[0];
+                    priceMap.set(dateKey, { open: r.open, high: r.high, low: r.low, close: r.close });
+                }
+            } catch (err: any) {
+                console.error(`[${new Date().toISOString()}] Failed to fetch ${etfSymbol}:`, err.message);
+            }
+        }
+        console.log(`[${new Date().toISOString()}] TQQQ dates: ${eodTQQQPriceMap.size}, SQQQ dates: ${eodSQQQPriceMap.size}`);
+    }
+
     // --- DATA RESAMPLING ---
     if (timeframe !== '1m' && timeframe !== '1-minute' && rows.length > 0) {
         console.log(`[${new Date().toISOString()}] Resampling data to ${timeframe}...`);
@@ -406,6 +438,92 @@ export async function runBacktest(params: StrategyParams) {
     let amrBarsSinceExit = 999;
     let amrEntryATR = 0;
 
+    // --- EOD DIRECTIONAL STRATEGY SETUP ---
+    let eodCurrentDirection = 0; // 1=long/TQQQ, -1=short/SQQQ, 0=flat
+    let eodBarsSinceExit = 999;
+
+    // Pre-compute indicators for EOD strategy
+    const eodFastEMAPeriod_eod = strategyParams.fastEMA ?? 8;
+    const eodSlowEMAPeriod_eod = strategyParams.slowEMA ?? 21;
+    const eodTrendEMAPeriod_eod = strategyParams.trendEMA ?? 50;
+    const eodRSIPeriod_eod = strategyParams.rsiPeriod ?? 14;
+    const eodMACDFastPeriod = strategyParams.macdFast ?? 12;
+    const eodMACDSlowPeriod = strategyParams.macdSlow ?? 26;
+    const eodMACDSignalPeriod = strategyParams.macdSignal ?? 9;
+    const eodATRPeriod_eod = strategyParams.atrPeriod ?? 14;
+
+    const eodFastEMAValues: (number | null)[] = strategyType === 'eod_directional' ? calculateEMA(closePrices, eodFastEMAPeriod_eod) : [];
+    const eodSlowEMAValues: (number | null)[] = strategyType === 'eod_directional' ? calculateEMA(closePrices, eodSlowEMAPeriod_eod) : [];
+    const eodTrendEMAValues_eod: (number | null)[] = strategyType === 'eod_directional' ? calculateEMA(closePrices, eodTrendEMAPeriod_eod) : [];
+    const eodRSIValues: (number | null)[] = strategyType === 'eod_directional' ? calculateRSI(closePrices, eodRSIPeriod_eod) : [];
+
+    // MACD = EMA(fast) - EMA(slow), Signal = EMA(MACD, signal period), Histogram = MACD - Signal
+    const eodMACDLine: (number | null)[] = [];
+    const eodMACDSignalLine: (number | null)[] = [];
+    const eodMACDHistogram: (number | null)[] = [];
+    if (strategyType === 'eod_directional') {
+        const macdFastEMA = calculateEMA(closePrices, eodMACDFastPeriod);
+        const macdSlowEMA = calculateEMA(closePrices, eodMACDSlowPeriod);
+        const macdRaw: number[] = [];
+        for (let mi = 0; mi < rows.length; mi++) {
+            if (macdFastEMA[mi] != null && macdSlowEMA[mi] != null) {
+                const macdVal = macdFastEMA[mi]! - macdSlowEMA[mi]!;
+                eodMACDLine.push(macdVal);
+                macdRaw.push(macdVal);
+            } else {
+                eodMACDLine.push(null);
+                macdRaw.push(0);
+            }
+        }
+        // Signal line = EMA of MACD line
+        const signalEMA = calculateEMA(macdRaw, eodMACDSignalPeriod);
+        for (let mi = 0; mi < rows.length; mi++) {
+            if (eodMACDLine[mi] != null && signalEMA[mi] != null) {
+                eodMACDSignalLine.push(signalEMA[mi]!);
+                eodMACDHistogram.push(eodMACDLine[mi]! - signalEMA[mi]!);
+            } else {
+                eodMACDSignalLine.push(null);
+                eodMACDHistogram.push(null);
+            }
+        }
+    }
+
+    // ATR for EOD strategy
+    const eodATRValues: (number | null)[] = [];
+    if (strategyType === 'eod_directional') {
+        const trs: number[] = [0];
+        for (let ri = 1; ri < rows.length; ri++) {
+            trs.push(Math.max(
+                rows[ri].high - rows[ri].low,
+                Math.abs(rows[ri].high - rows[ri - 1].close),
+                Math.abs(rows[ri].low - rows[ri - 1].close)
+            ));
+        }
+        for (let ri = 0; ri < eodATRPeriod_eod; ri++) eodATRValues.push(null);
+        let atrSum = trs.slice(1, eodATRPeriod_eod + 1).reduce((a, b) => a + b, 0);
+        eodATRValues.push(atrSum / eodATRPeriod_eod);
+        for (let ri = eodATRPeriod_eod + 1; ri < rows.length; ri++) {
+            const prev = eodATRValues[ri - 1]!;
+            eodATRValues.push((prev * (eodATRPeriod_eod - 1) + trs[ri]) / eodATRPeriod_eod);
+        }
+    }
+
+    // 20-period average volume for EOD
+    const eodVolPeriod = 20;
+    const eodAvgVolume: (number | null)[] = [];
+    if (strategyType === 'eod_directional') {
+        const volumes = rows.map(r => r.volume);
+        for (let vi = 0; vi < rows.length; vi++) {
+            if (vi < eodVolPeriod - 1) {
+                eodAvgVolume.push(null);
+            } else {
+                let volSum = 0;
+                for (let vj = vi - eodVolPeriod + 1; vj <= vi; vj++) volSum += volumes[vj];
+                eodAvgVolume.push(volSum / eodVolPeriod);
+            }
+        }
+    }
+
     // --- AMR MULTI-TIMEFRAME TREND FILTER ---
     // Resample execution bars to a higher timeframe and compute EMA trend for entry confirmation
     // htfConfirm: 'none'=off, '1h', '4h', '1d', or legacy 1=1h, 0=off
@@ -623,7 +741,25 @@ export async function runBacktest(params: StrategyParams) {
         }
 
         // Drawdown & Equity Tracking
-        const currentEquity = currentBalance + (totalSharesHeld * currentPrice);
+        let currentEquity: number;
+        if (strategyType === 'eod_directional' && openPositions.length > 0) {
+            // Use actual TQQQ/SQQQ prices for mark-to-market
+            let unrealizedValue = 0;
+            for (const pos of openPositions) {
+                const posDir = (pos as any).direction ?? 1;
+                const etfPriceMap = posDir === 1 ? eodTQQQPriceMap : eodSQQQPriceMap;
+                const etfData = etfPriceMap.get(rowDate);
+                if (etfData) {
+                    unrealizedValue += pos.shares * etfData.close;
+                } else {
+                    // Fallback: use buy value if no ETF data for this date
+                    unrealizedValue += pos.amount;
+                }
+            }
+            currentEquity = currentBalance + unrealizedValue;
+        } else {
+            currentEquity = currentBalance + (totalSharesHeld * currentPrice);
+        }
         const buyAndHoldBalance = buyAndHoldShares * currentPrice;
 
         const sampleRate = Math.max(1, Math.floor(rows.length / 1000));
@@ -660,6 +796,7 @@ export async function runBacktest(params: StrategyParams) {
         let buyReason = '';
         let sellReason = '';
         let sellLots: Position[] = [];
+        let compositeScoreForSizing: number | null = null; // EOD: pass score to buy sizing
 
         const prevPrice = i > 0 ? rows[i - 1].close : null;
 
@@ -907,13 +1044,160 @@ export async function runBacktest(params: StrategyParams) {
                     }
                 }
             }
+        } else if (strategyType === 'eod_directional') {
+            // === EOD DIRECTIONAL STRATEGY ===
+            // Analyzes index ($IUXX) on daily bars, simulates TQQQ/SQQQ leveraged ETF trading
+            // Multi-factor composite scoring: EMA Trend + RSI + MACD + Price Position + Volume
+
+            if (i >= 1) {
+                const eodEntryThreshold = strategyParams.entryThreshold ?? 40;
+                const eodExitThreshold = strategyParams.exitThreshold ?? 10;
+                const eodTrailATR = strategyParams.trailATR ?? 2.5;
+
+                // Use pre-computed indicators from EOD setup section
+                const curFastEOD = eodFastEMAValues[i];
+                const curSlowEOD = eodSlowEMAValues[i];
+                const curTrendEOD = eodTrendEMAValues_eod[i];
+                const prevFastEOD = i > 0 ? eodFastEMAValues[i - 1] : null;
+                const prevSlowEOD = i > 0 ? eodSlowEMAValues[i - 1] : null;
+                const curRSIeod = eodRSIValues[i];
+                const curMACDHist = eodMACDHistogram[i];
+                const prevMACDHist = i > 0 ? eodMACDHistogram[i - 1] : null;
+                const curATReod = eodATRValues[i];
+                const curVolume = row.volume;
+                const avgVol = eodAvgVolume[i];
+
+                if (curFastEOD != null && curSlowEOD != null && curTrendEOD != null &&
+                    prevFastEOD != null && prevSlowEOD != null &&
+                    curRSIeod != null && curATReod != null && prevPrice != null) {
+
+                    // ========== FACTOR 1: EMA TREND ALIGNMENT (±30 points max) ==========
+                    let emaTrendScore = 0;
+                    const fastAboveSlow = curFastEOD > curSlowEOD;
+                    const priceAboveTrend = currentPrice > curTrendEOD;
+                    const priceBelowTrend = currentPrice < curTrendEOD;
+
+                    // EMA slope (5-bar)
+                    const trendSlope = i >= 5 && eodTrendEMAValues_eod[i - 5] != null && eodTrendEMAValues_eod[i - 5] !== 0
+                        ? ((curTrendEOD - eodTrendEMAValues_eod[i - 5]!) / eodTrendEMAValues_eod[i - 5]!) * 100 : 0;
+
+                    if (fastAboveSlow && priceAboveTrend) emaTrendScore = 20;
+                    else if (!fastAboveSlow && priceBelowTrend) emaTrendScore = -20;
+                    else if (fastAboveSlow && !priceAboveTrend) emaTrendScore = 5;
+                    else if (!fastAboveSlow && !priceBelowTrend) emaTrendScore = -5;
+                    emaTrendScore += Math.max(-10, Math.min(10, trendSlope * 5));
+
+                    // ========== FACTOR 2: RSI MOMENTUM (±25 points max) ==========
+                    let rsiScore = 0;
+                    if (curRSIeod > 60) rsiScore = Math.min(25, (curRSIeod - 50) * 0.8);
+                    else if (curRSIeod < 40) rsiScore = Math.max(-25, (curRSIeod - 50) * 0.8);
+                    else rsiScore = (curRSIeod - 50) * 0.3;
+
+                    // ========== FACTOR 3: MACD HISTOGRAM (±25 points max) ==========
+                    let macdScore = 0;
+                    if (curMACDHist != null) {
+                        const histNorm = curATReod > 0 ? (curMACDHist / curATReod) * 100 : 0;
+                        macdScore = Math.max(-25, Math.min(25, histNorm * 2));
+                        if (prevMACDHist != null) {
+                            if (curMACDHist > prevMACDHist && curMACDHist > 0) macdScore += 5;
+                            if (curMACDHist < prevMACDHist && curMACDHist < 0) macdScore -= 5;
+                        }
+                        macdScore = Math.max(-25, Math.min(25, macdScore));
+                    }
+
+                    // ========== FACTOR 4: PRICE POSITION (±10 points max) ==========
+                    let pricePositionScore = 0;
+                    if (row.high !== row.low) {
+                        const closePos = (row.close - row.low) / (row.high - row.low);
+                        pricePositionScore = (closePos - 0.5) * 20;
+                    }
+
+                    // ========== FACTOR 5: VOLUME CONVICTION (±10 points max) ==========
+                    let volumeScore = 0;
+                    if (avgVol != null && avgVol > 0 && curVolume > 0) {
+                        const volRatio = curVolume / avgVol;
+                        const priceChg = prevPrice > 0 ? (currentPrice - prevPrice) / prevPrice : 0;
+                        if (volRatio > 1.2) {
+                            volumeScore = priceChg > 0 ? Math.min(10, volRatio * 3) : Math.max(-10, -volRatio * 3);
+                        }
+                    }
+
+                    // ========== COMPOSITE SCORE (range: roughly -100 to +100) ==========
+                    const compositeScore = emaTrendScore + rsiScore + macdScore + pricePositionScore + volumeScore;
+                    const atrPercent = curATReod > 0 ? (curATReod / currentPrice) * 100 : 1;
+
+                    // ========== EXIT LOGIC ==========
+                    if (openPositions.length > 0) {
+                        const pos = openPositions[0];
+                        const posDirection = (pos as any).direction as number;
+                        const isLong = posDirection === 1;
+                        const isShort = posDirection === -1;
+                        let exitReason = '';
+
+                        // 1. ATR Trailing Stop
+                        const trailPct = eodTrailATR * atrPercent / 100;
+                        if (isLong && currentPrice < pos.peakPrice * (1 - trailPct)) {
+                            exitReason = `TQQQ Trail Stop (${(trailPct * 100).toFixed(1)}% from peak $${pos.peakPrice.toFixed(2)})`;
+                        } else if (isShort && currentPrice > pos.peakPrice * (1 + trailPct)) {
+                            exitReason = `SQQQ Trail Stop (${(trailPct * 100).toFixed(1)}% from best $${pos.peakPrice.toFixed(2)})`;
+                        }
+
+                        // 2. Score reversal — signal flipped against position
+                        if (!exitReason) {
+                            if (isLong && compositeScore < -eodExitThreshold) {
+                                exitReason = `Signal Reversal to Bearish (Score: ${compositeScore.toFixed(0)})`;
+                            } else if (isShort && compositeScore > eodExitThreshold) {
+                                exitReason = `Signal Reversal to Bullish (Score: ${compositeScore.toFixed(0)})`;
+                            }
+                        }
+
+                        if (exitReason) {
+                            shouldSell = true;
+                            sellLots = [...openPositions];
+                            sellReason = exitReason;
+                            eodBarsSinceExit = 0;
+                            eodCurrentDirection = 0;
+                        }
+                    }
+
+                    // ========== ENTRY LOGIC ==========
+                    if (openPositions.length < 1 && !shouldSell) {
+                        const cooldown = strategyParams.cooldownBars ?? 2;
+                        if (eodBarsSinceExit >= cooldown) {
+                            if (compositeScore >= eodEntryThreshold) {
+                                shouldBuy = true;
+                                buyReason = `TQQQ Entry [Score:${compositeScore.toFixed(0)}] EMA:${emaTrendScore.toFixed(0)} RSI:${rsiScore.toFixed(0)} MACD:${macdScore.toFixed(0)} Pos:${pricePositionScore.toFixed(0)} Vol:${volumeScore.toFixed(0)}`;
+                                eodCurrentDirection = 1;
+                            } else if (compositeScore <= -eodEntryThreshold) {
+                                shouldBuy = true;
+                                buyReason = `SQQQ Entry [Score:${compositeScore.toFixed(0)}] EMA:${emaTrendScore.toFixed(0)} RSI:${rsiScore.toFixed(0)} MACD:${macdScore.toFixed(0)} Pos:${pricePositionScore.toFixed(0)} Vol:${volumeScore.toFixed(0)}`;
+                                eodCurrentDirection = -1;
+                            }
+                        }
+                    }
+
+                    if (openPositions.length < 1) eodBarsSinceExit++;
+
+                    // Pass score to buy execution for position sizing
+                    compositeScoreForSizing = compositeScore;
+                }
+            }
         }
 
         // --- TRAILING STOP LOSS UPDATE (ALWAYS ACTIVE FOR PERFORMANCE) ---
         if (openPositions.length > 0) {
             for (const pos of openPositions) {
-                if (currentPrice > pos.peakPrice) {
-                    pos.peakPrice = currentPrice;
+                const posDir = (pos as any).direction ?? 1;
+                if (posDir === -1) {
+                    // Short position (SQQQ): track the LOWEST price as "peak" (best short entry)
+                    if (currentPrice < pos.peakPrice) {
+                        pos.peakPrice = currentPrice;
+                    }
+                } else {
+                    // Long position (default): track highest price
+                    if (currentPrice > pos.peakPrice) {
+                        pos.peakPrice = currentPrice;
+                    }
                 }
             }
         }
@@ -921,8 +1205,22 @@ export async function runBacktest(params: StrategyParams) {
         // Execute Sells
         if (shouldSell && sellLots.length > 0) {
             for (const pos of sellLots) {
-                const sellAmount = pos.shares * currentPrice;
-                const profit = sellAmount - pos.amount;
+                let sellAmount: number;
+                let profit: number;
+
+                if (strategyType === 'eod_directional') {
+                    // Use actual TQQQ/SQQQ prices
+                    const posDir = (pos as any).direction ?? 1;
+                    const etfPriceMap = posDir === 1 ? eodTQQQPriceMap : eodSQQQPriceMap;
+                    const etfData = etfPriceMap.get(rowDate);
+                    const etfSellPrice = etfData ? etfData.close : (pos as any).etfBuyPrice; // fallback to buy price
+                    sellAmount = pos.shares * etfSellPrice;
+                    profit = sellAmount - pos.amount;
+                } else {
+                    sellAmount = pos.shares * currentPrice;
+                    profit = sellAmount - pos.amount;
+                }
+
                 currentBalance += sellAmount;
                 totalProfit += profit;
                 totalSharesHeld -= pos.shares;
@@ -932,6 +1230,19 @@ export async function runBacktest(params: StrategyParams) {
 
                 if (strategyType === 'grid_trading') referencePrice = currentPrice;
                 hasTradedGrid = true;
+
+                const dirLabel = strategyType === 'eod_directional'
+                    ? ((pos as any).direction === 1 ? 'TQQQ' : 'SQQQ')
+                    : '';
+                const etfSellPriceDisplay = strategyType === 'eod_directional'
+                    ? (() => {
+                        const pm = (pos as any).direction === 1 ? eodTQQQPriceMap : eodSQQQPriceMap;
+                        const d = pm.get(rowDate);
+                        return d ? d.close.toFixed(2) : '?';
+                    })() : '';
+                const commentPrefix = dirLabel
+                    ? `${dirLabel} sold at $${etfSellPriceDisplay} (bought at $${(pos as any).etfBuyPrice?.toFixed(2) ?? '?'})`
+                    : `Sold lot bought at ${pos.buyPrice.toFixed(2)}`;
 
                 trades.push({
                     tradeNo: tradeNoCounter++,
@@ -945,7 +1256,7 @@ export async function runBacktest(params: StrategyParams) {
                     accountBalance: currentBalance + (totalSharesHeld * currentPrice),
                     amount: sellAmount,
                     profit,
-                    comment: `Sold lot bought at ${pos.buyPrice.toFixed(2)} (${sellComment})`
+                    comment: `${commentPrefix} (${sellComment})`
                 });
 
                 // Remove from open positions
@@ -963,45 +1274,104 @@ export async function runBacktest(params: StrategyParams) {
             amountToBuy = currentBalance;
         } else if (strategyType === 'amr') {
             amountToBuy = currentBalance; // Full position sizing (all-in, all-out)
+        } else if (strategyType === 'eod_directional') {
+            // Score-based position sizing: stronger signal = more capital deployed
+            // At threshold (e.g. 40) → deploy 30% of cash
+            // At max score (~100) → deploy 100% of cash
+            // Linear scale between
+            const entryThresh = strategyParams.entryThreshold ?? 40;
+            const maxScore = 100;
+            const absScore = Math.abs(eodCurrentDirection === 1
+                ? Math.max(0, compositeScoreForSizing ?? 0)
+                : Math.max(0, -(compositeScoreForSizing ?? 0)));
+            const scorePct = Math.min(1.0, Math.max(0.3, (absScore - entryThresh) / (maxScore - entryThresh) * 0.7 + 0.3));
+            amountToBuy = currentBalance * scorePct;
         }
 
         if (shouldBuy && currentBalance >= amountToBuy && amountToBuy > 0) {
-            const sharesToBuy = amountToBuy / currentPrice;
-            currentBalance -= amountToBuy;
-            if (strategyType === 'grid_trading') referencePrice = currentPrice;
-            hasTradedGrid = true;
-            lastTradeDay = rowDate; // Record the day of the trade
-            totalSharesHeld += sharesToBuy;
-            totalInvestedInUnsold += amountToBuy;
+            let actualBuyPrice = currentPrice;
+            let etfBuyPriceVal: number | null = null;
 
-            openPositions.push({
-                id: positionIdCounter++,
-                buyPrice: currentPrice,
-                peakPrice: currentPrice, // Initialize peakPrice at buyPrice
-                shares: sharesToBuy,
-                amount: amountToBuy,
-                buyTime: currentTime
-            });
+            // For EOD directional: buy actual TQQQ/SQQQ shares at real ETF price
+            if (strategyType === 'eod_directional') {
+                const etfPriceMap = eodCurrentDirection === 1 ? eodTQQQPriceMap : eodSQQQPriceMap;
+                const etfData = etfPriceMap.get(rowDate);
+                if (!etfData) {
+                    // No ETF data for this date — skip this trade
+                    shouldBuy = false;
+                } else {
+                    etfBuyPriceVal = etfData.close;
+                    actualBuyPrice = etfData.close;
+                }
+            }
 
-            trades.push({
-                tradeNo: tradeNoCounter++,
-                datetime: currentTime,
-                type: 'BUY',
-                symbol,
-                price: currentPrice,
-                shares: sharesToBuy,
-                totalShares: totalSharesHeld,
-                remainingBalance: currentBalance,
-                accountBalance: currentBalance + (totalSharesHeld * currentPrice),
-                amount: amountToBuy,
-                profit: 0,
-                comment: buyReason
-            });
+            if (shouldBuy) {
+                const sharesToBuy = amountToBuy / actualBuyPrice;
+                currentBalance -= amountToBuy;
+                if (strategyType === 'grid_trading') referencePrice = currentPrice;
+                hasTradedGrid = true;
+                lastTradeDay = rowDate;
+                totalSharesHeld += sharesToBuy;
+                totalInvestedInUnsold += amountToBuy;
+
+                const newPos: any = {
+                    id: positionIdCounter++,
+                    buyPrice: currentPrice, // Index price (for signal reference)
+                    peakPrice: currentPrice,
+                    shares: sharesToBuy,
+                    amount: amountToBuy,
+                    buyTime: currentTime
+                };
+                if (strategyType === 'eod_directional') {
+                    newPos.direction = eodCurrentDirection;
+                    newPos.etfBuyPrice = etfBuyPriceVal;
+                }
+                openPositions.push(newPos);
+
+                const dirLabel = strategyType === 'eod_directional'
+                    ? (eodCurrentDirection === 1 ? '🟢 TQQQ' : '🔴 SQQQ')
+                    : '';
+                const etfPriceInfo = etfBuyPriceVal ? ` @ $${etfBuyPriceVal.toFixed(2)}` : '';
+
+                trades.push({
+                    tradeNo: tradeNoCounter++,
+                    datetime: currentTime,
+                    type: 'BUY',
+                    symbol: strategyType === 'eod_directional'
+                        ? (eodCurrentDirection === 1 ? 'TQQQ' : 'SQQQ') : symbol,
+                    price: actualBuyPrice,
+                    shares: sharesToBuy,
+                    totalShares: totalSharesHeld,
+                    remainingBalance: currentBalance,
+                    accountBalance: currentBalance + (totalSharesHeld * actualBuyPrice),
+                    amount: amountToBuy,
+                    profit: 0,
+                    comment: dirLabel ? `${dirLabel}${etfPriceInfo} — ${buyReason}` : buyReason
+                });
+            }
         }
     }
 
     console.log(`[${new Date().toISOString()}] Processing complete for ${symbol}`);
-    const finalAccountValue = currentBalance + (totalSharesHeld * (rows[rows.length - 1] as any).close);
+    let finalAccountValue: number;
+    const lastClose = (rows[rows.length - 1] as any).close;
+    const lastDate = (rows[rows.length - 1] as any).date;
+    if (strategyType === 'eod_directional' && openPositions.length > 0) {
+        let unrealizedValue = 0;
+        for (const pos of openPositions) {
+            const posDir = (pos as any).direction ?? 1;
+            const etfPriceMap = posDir === 1 ? eodTQQQPriceMap : eodSQQQPriceMap;
+            const etfData = etfPriceMap.get(lastDate);
+            if (etfData) {
+                unrealizedValue += pos.shares * etfData.close;
+            } else {
+                unrealizedValue += pos.amount; // fallback
+            }
+        }
+        finalAccountValue = currentBalance + unrealizedValue;
+    } else {
+        finalAccountValue = currentBalance + (totalSharesHeld * lastClose);
+    }
 
     return {
         trades,

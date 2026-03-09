@@ -13,9 +13,9 @@ export function validateSymbol(symbol: any): string {
 
     const cleaned = symbol.trim().toUpperCase();
 
-    // Symbols should be alphanumeric, possibly with dots (like BRK.A)
+    // Symbols should be alphanumeric, possibly with dots (like BRK.A) or $ prefix (like $IUXX)
     // and typically between 1 and 10 characters.
-    if (!/^[A-Z0-9.]+$/.test(cleaned) || cleaned.length === 0 || cleaned.length > 10) {
+    if (!/^[\$A-Z0-9.]+$/.test(cleaned) || cleaned.length === 0 || cleaned.length > 10) {
         throw new Error('Invalid symbol format');
     }
 
