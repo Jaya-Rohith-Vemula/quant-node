@@ -58,8 +58,17 @@ export function StrategyGuide({ strategyId, onBack }: StrategyGuideProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="p-6 rounded-3xl border border-border glass bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden group">
                         <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                            <ArrowDownCircle className="text-red-400" size={20} />
-                            Entry Logic (Buy)
+                            {strategy.id === 'volatility_analysis' ? (
+                                <>
+                                    <Target className="text-blue-400" size={20} />
+                                    Analysis Objective
+                                </>
+                            ) : (
+                                <>
+                                    <ArrowDownCircle className="text-red-400" size={20} />
+                                    Entry Logic (Buy)
+                                </>
+                            )}
                         </h3>
                         <p className="text-muted-foreground leading-relaxed relative z-10">
                             {strategy.guide.entry}
@@ -68,8 +77,17 @@ export function StrategyGuide({ strategyId, onBack }: StrategyGuideProps) {
 
                     <div className="p-6 rounded-3xl border border-border glass bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden group">
                         <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                            <ArrowUpCircle className="text-green-400" size={20} />
-                            Exit Logic (Sell)
+                            {strategy.id === 'volatility_analysis' ? (
+                                <>
+                                    <BarChart3 className="text-green-400" size={20} />
+                                    Statistical Outputs
+                                </>
+                            ) : (
+                                <>
+                                    <ArrowUpCircle className="text-green-400" size={20} />
+                                    Exit Logic (Sell)
+                                </>
+                            )}
                         </h3>
                         <p className="text-muted-foreground leading-relaxed relative z-10">
                             {strategy.guide.exit}
@@ -156,21 +174,39 @@ export function StrategyGuide({ strategyId, onBack }: StrategyGuideProps) {
                 {strategy.id === 'volatility_analysis' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="p-6 rounded-2xl border border-border space-y-3">
-                            <h4 className="font-bold flex items-center gap-2">
-                                <Info size={16} className="text-primary" />
+                            <h4 className="font-bold flex items-center gap-2 text-blue-400">
+                                <Info size={16} />
                                 Average Volatility
                             </h4>
                             <p className="text-sm text-muted-foreground">
-                                The typical percentage change for the selected timeframe, helping you set realistic expectations.
+                                The mean High-to-Low range across all periods. Use this as a baseline for "normal" price action to avoid overreacting to typical market noise.
                             </p>
                         </div>
                         <div className="p-6 rounded-2xl border border-border space-y-3">
-                            <h4 className="font-bold flex items-center gap-2">
-                                <TrendingDown size={16} className="text-primary" />
-                                Win/Loss Ratio
+                            <h4 className="font-bold flex items-center gap-2 text-red-400">
+                                <TrendingDown size={16} />
+                                Extreme Outliers
                             </h4>
                             <p className="text-sm text-muted-foreground">
-                                The breakdown of historical directionality—how often the asset finishes positive vs negative during the timeframe.
+                                Maximum and Minimum spikes show the absolute historical range. Use these to set "safety" stop-losses that are statistically unlikely to be hit by random volatility.
+                            </p>
+                        </div>
+                        <div className="p-6 rounded-2xl border border-border space-y-3">
+                            <h4 className="font-bold flex items-center gap-2 text-green-400">
+                                <Target size={16} />
+                                Probabilistic Edge
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                                Use the filter to see how often the asset exceeds target moves. If only 10% of periods hit 2%, a 3% profit target may be statistically unrealistic.
+                            </p>
+                        </div>
+                        <div className="p-6 rounded-2xl border border-border space-y-3">
+                            <h4 className="font-bold flex items-center gap-2 text-amber-400">
+                                <Clock size={16} />
+                                Time-Based Variance
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                                Volatility often clusters (e.g., at market open). Comparing specific time windows helps identify the best "power hours" for your specific strategy.
                             </p>
                         </div>
                     </div>
