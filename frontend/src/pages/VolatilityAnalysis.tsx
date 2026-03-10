@@ -30,15 +30,12 @@ export function VolatilityAnalysis({ results, loading, symbol, params }: Volatil
                             {params.marketHoursOnly && (
                                 <span className="text-[10px] md:text bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium flex items-center gap-2">
                                     <Clock size={14} />
-                                    Market Hours (09:30 - 16:00)
+                                    {params.startTime && params.endTime && (params.startTime !== '09:30' || params.endTime !== '16:00')
+                                        ? `${params.startTime} - ${params.endTime}`
+                                        : "Market Hours (09:30 - 16:00)"}
                                 </span>
                             )}
-                            {!params.marketHoursOnly && params.startTime && params.endTime && (
-                                <span className="text-[10px] md:text bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium flex items-center gap-2">
-                                    <Clock size={14} />
-                                    {params.startTime} - {params.endTime}
-                                </span>
-                            )}
+
                         </div>
                     )}
                 </div>
