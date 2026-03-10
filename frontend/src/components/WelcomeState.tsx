@@ -21,7 +21,7 @@ export function WelcomeState({ onOpenSidebar, onNavigateToGuide, onNavigateToFee
             <div className="space-y-4 max-w-md">
                 <h2 className="text-3xl md:text-4xl font-black tracking-tight">Welcome to Quant Node</h2>
                 <p className="text-muted-foreground text-base md:text-lg leading-relaxed">
-                    The ultimate quantitative trading backtester. Change strategy types in the settings to explore different algorithms, then hit <span className="text-primary font-bold">Run Simulation</span> to analyze results.
+                    The ultimate quantitative trading backtester. Change strategy types to explore algorithms, or switch to <span className="text-primary font-bold">Analysis</span> mode to study asset volatility, then hit <span className="text-primary font-bold">Run Simulation</span> or <span className="text-primary font-bold">Analyze</span> to see results.
                 </p>
 
                 <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 text-sm text-muted-foreground space-y-3 max-w-[95%] mx-auto relative group/card">
@@ -60,11 +60,16 @@ export function WelcomeState({ onOpenSidebar, onNavigateToGuide, onNavigateToFee
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-4xl">
                 <FeatureCard
                     icon={<Zap size={20} className="text-yellow-400" />}
                     title="Flash Backtesting"
                     desc="Analyze years of historical data in milliseconds."
+                />
+                <FeatureCard
+                    icon={<LineChart size={20} className="text-green-400" />}
+                    title="Volatility Analysis"
+                    desc="Study asset volatility across different timeframes."
                 />
                 <FeatureCard
                     icon={<BarChart3 size={20} className="text-blue-400" />}

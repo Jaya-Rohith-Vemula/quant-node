@@ -23,6 +23,7 @@ export interface Strategy {
     description: string;
     guide: StrategyGuideMetadata;
     parameters: StrategyParameter[];
+    isHidden?: boolean;
 }
 
 export const STRATEGIES: Strategy[] = [
@@ -448,6 +449,24 @@ export const STRATEGIES: Strategy[] = [
                 defaultValue: 2,
             },
         ],
+    },
+    {
+        id: 'volatility_analysis',
+        name: 'Volatility Analysis',
+        description: 'Analyzes the statistical volatility of an asset over different time periods (daily, weekly, monthly).',
+        isHidden: true,
+        guide: {
+            entry: "This is an analysis tool rather than a trading strategy. It processes historical data to calculate average moves, volatility, and momentum indicators.",
+            exit: "There are no traditional exits. The tool outputs statistical distributions to help you understand how the asset typically behaves.",
+            tip: "Use these insights to set better stop losses and profit targets for your other strategies.",
+            keyPoints: [
+                "Statistical volatility breakdown",
+                "Daily, weekly, and monthly analysis",
+                "Helps identify natural volatility boundaries",
+                "Market hours filtering available"
+            ]
+        },
+        parameters: [],
     }
 ];
 

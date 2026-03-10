@@ -16,9 +16,8 @@ interface NavbarProps {
 
 export function Navbar({ activePage }: NavbarProps) {
     const navigate = useNavigate();
-
     const navItems = [
-        { id: 'simulator', label: 'Simulator', icon: LineChart, path: '/' },
+        { id: 'results', label: 'Results', icon: LineChart, path: '/' },
         { id: 'guide', label: 'How it works', icon: BookOpen, path: '/how-it-works' },
         { id: 'updates', label: 'System Updates', icon: Activity, path: '/updates' },
         { id: 'feedback', label: 'Feedback', icon: MessageSquare, path: '/feedback' },

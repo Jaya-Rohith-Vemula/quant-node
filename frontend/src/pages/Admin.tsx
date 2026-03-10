@@ -261,7 +261,7 @@ export function Admin({ onBack }: AdminProps) {
                         className="group -ml-4 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                     >
                         <ChevronLeft className="mr-2 group-hover:-translate-x-1 transition-transform " size={20} />
-                        Back to Simulator
+                        Back to Results
                     </Button>
                     <Button
                         variant="ghost"

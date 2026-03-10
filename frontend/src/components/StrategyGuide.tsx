@@ -10,7 +10,8 @@ import {
     DollarSign,
     TrendingDown,
     ChevronLeft,
-    Lightbulb
+    Lightbulb,
+    Clock
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { STRATEGIES } from '../strategies';
@@ -33,7 +34,7 @@ export function StrategyGuide({ strategyId, onBack }: StrategyGuideProps) {
                     className="group -ml-4 text-muted-foreground hover:text-primary transition-colors mb-4 cursor-pointer"
                 >
                     <ChevronLeft className="mr-2 group-hover:-translate-x-1 transition-transform " size={20} />
-                    Back to Simulator
+                    Back to Results
                 </Button>
 
                 <div className="flex items-center gap-4 mb-2">
@@ -98,57 +99,103 @@ export function StrategyGuide({ strategyId, onBack }: StrategyGuideProps) {
                     <h2 className="text-2xl font-bold tracking-tight">{strategy.name} Parameters</h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {strategy.parameters.map((p, i) => (
-                        <div key={i} className="flex gap-4 p-5 rounded-2xl border border-border hover:bg-secondary/30 transition-colors">
+                {strategy.id === 'volatility_analysis' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex gap-4 p-5 rounded-2xl border border-border hover:bg-secondary/30 transition-colors">
                             <div className="mt-1">
-                                {p.unit === '%' ? <TrendingDown size={18} className="text-red-400" /> : <DollarSign size={18} className="text-blue-400" />}
+                                <Clock size={18} className="text-blue-400" />
                             </div>
                             <div className="space-y-1">
-                                <h4 className="font-bold">{p.label}</h4>
-                                <p className="text-sm text-muted-foreground">Adjusts the {p.label.toLowerCase()} for the simulation.</p>
+                                <h4 className="font-bold">Time Filter</h4>
+                                <p className="text-sm text-muted-foreground">Toggle to only analyze moves that occur during specific market hours.</p>
                             </div>
                         </div>
-                    ))}
-                    <div className="flex gap-4 p-5 rounded-2xl border border-border hover:bg-secondary/30 transition-colors">
-                        <div className="mt-1">
-                            <ShieldCheck size={18} className="text-primary" />
-                        </div>
-                        <div className="space-y-1">
-                            <h4 className="font-bold">Initial Balance</h4>
-                            <p className="text-sm text-muted-foreground">Your total starting capital for the backtest.</p>
+                        <div className="flex gap-4 p-5 rounded-2xl border border-border hover:bg-secondary/30 transition-colors">
+                            <div className="mt-1">
+                                <Info size={18} className="text-primary" />
+                            </div>
+                            <div className="space-y-1">
+                                <h4 className="font-bold">Time Range</h4>
+                                <p className="text-sm text-muted-foreground">Adjusts the intraday start and end time window to analyze (e.g. 09:30 to 16:00).</p>
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {strategy.parameters.map((p, i) => (
+                            <div key={i} className="flex gap-4 p-5 rounded-2xl border border-border hover:bg-secondary/30 transition-colors">
+                                <div className="mt-1">
+                                    {p.unit === '%' ? <TrendingDown size={18} className="text-red-400" /> : <DollarSign size={18} className="text-blue-400" />}
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="font-bold">{p.label}</h4>
+                                    <p className="text-sm text-muted-foreground">Adjusts the {p.label.toLowerCase()} for the simulation.</p>
+                                </div>
+                            </div>
+                        ))}
+                        <div className="flex gap-4 p-5 rounded-2xl border border-border hover:bg-secondary/30 transition-colors">
+                            <div className="mt-1">
+                                <ShieldCheck size={18} className="text-primary" />
+                            </div>
+                            <div className="space-y-1">
+                                <h4 className="font-bold">Initial Balance</h4>
+                                <p className="text-sm text-muted-foreground">Your total starting capital for the backtest.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </section>
 
-            {/* Performance Stats Section */}
+            {/* Interpreting Results Section */}
             <section className="space-y-4">
                 <div className="flex items-center gap-3">
                     <BarChart3 className="text-primary" size={24} />
                     <h2 className="text-2xl font-bold tracking-tight">Interpreting Results</h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-6 rounded-2xl border border-border space-y-3">
-                        <h4 className="font-bold flex items-center gap-2">
-                            <Info size={16} className="text-primary" />
-                            Total Net Worth
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                            Your current account value, calculating both remaining cash and the current market value of all unsold shares at the end of the period.
-                        </p>
+                {strategy.id === 'volatility_analysis' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-6 rounded-2xl border border-border space-y-3">
+                            <h4 className="font-bold flex items-center gap-2">
+                                <Info size={16} className="text-primary" />
+                                Average Volatility
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                                The typical percentage change for the selected timeframe, helping you set realistic expectations.
+                            </p>
+                        </div>
+                        <div className="p-6 rounded-2xl border border-border space-y-3">
+                            <h4 className="font-bold flex items-center gap-2">
+                                <TrendingDown size={16} className="text-primary" />
+                                Win/Loss Ratio
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                                The breakdown of historical directionality—how often the asset finishes positive vs negative during the timeframe.
+                            </p>
+                        </div>
                     </div>
-                    <div className="p-6 rounded-2xl border border-border space-y-3">
-                        <h4 className="font-bold flex items-center gap-2">
-                            <TrendingDown size={16} className="text-red-400" />
-                            Max Drawdown
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                            The largest percentage drop your portfolio experienced from its highest peak. A critical measure of risk.
-                        </p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-6 rounded-2xl border border-border space-y-3">
+                            <h4 className="font-bold flex items-center gap-2">
+                                <Info size={16} className="text-primary" />
+                                Total Net Worth
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                                Your current account value, calculating both remaining cash and the current market value of all unsold shares at the end of the period.
+                            </p>
+                        </div>
+                        <div className="p-6 rounded-2xl border border-border space-y-3">
+                            <h4 className="font-bold flex items-center gap-2">
+                                <TrendingDown size={16} className="text-red-400" />
+                                Max Drawdown
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                                The largest percentage drop your portfolio experienced from its highest peak. A critical measure of risk.
+                            </p>
+                        </div>
                     </div>
-                </div>
+                )}
             </section>
 
             {/* Call to action */}
@@ -158,7 +205,7 @@ export function StrategyGuide({ strategyId, onBack }: StrategyGuideProps) {
                     Ready to put these concepts to the test? Use the sidebar to tweak your parameters and find the optimal configuration for your chosen asset.
                 </p>
                 <Button onClick={onBack} size="lg" className="rounded-xl px-8 font-bold cursor-pointer">
-                    Back to Simulator
+                    Back to Results
                 </Button>
             </div>
         </div>

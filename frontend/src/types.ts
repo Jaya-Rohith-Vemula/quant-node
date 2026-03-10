@@ -25,6 +25,19 @@ export interface BacktestParams {
     strategyType: string;
     strategyParams: Record<string, any>;
     timeframe?: string;
+    startTime?: string;
+    endTime?: string;
+    marketHoursOnly?: boolean;
+}
+
+import type { PeriodResult } from './components/VolatilityCard';
+
+export interface AnalysisResults {
+    daily: PeriodResult | null;
+    weekly: PeriodResult | null;
+    monthly: PeriodResult | null;
+    totalRows: number;
+    error?: string;
 }
 
 export interface BacktestResults {

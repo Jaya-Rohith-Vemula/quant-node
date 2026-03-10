@@ -8,6 +8,7 @@ interface ParameterSliderProps {
     step?: number;
     unit?: string;
     onChange: (value: number) => void;
+    formatValue?: (value: number) => string;
 }
 
 export const ParameterSlider: React.FC<ParameterSliderProps> = ({
@@ -18,6 +19,7 @@ export const ParameterSlider: React.FC<ParameterSliderProps> = ({
     step = 1,
     unit = '',
     onChange,
+    formatValue,
 }) => {
     const [localValue, setLocalValue] = useState(value);
 
@@ -39,7 +41,7 @@ export const ParameterSlider: React.FC<ParameterSliderProps> = ({
                     {label}
                 </label>
                 <span className="text-foreground font-bold text-lg">
-                    {localValue}{unit}
+                    {formatValue ? formatValue(localValue) : localValue}{unit}
                 </span>
             </div>
             <input
@@ -54,8 +56,8 @@ export const ParameterSlider: React.FC<ParameterSliderProps> = ({
                 className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-muted-foreground"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground px-1 font-mono">
-                <span>{min}{unit}</span>
-                <span>{max}{unit}</span>
+                <span>{formatValue ? formatValue(min) : min}{unit}</span>
+                <span>{formatValue ? formatValue(max) : max}{unit}</span>
             </div>
         </div>
     );

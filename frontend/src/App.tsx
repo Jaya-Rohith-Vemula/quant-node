@@ -42,7 +42,8 @@ import { ThemeProvider } from './components/theme-provider';
 import { Updates } from './pages/Updates';
 import { Feedback } from './pages/Feedback';
 import { Admin } from './pages/Admin';
-import type { BacktestParams, BacktestResults } from './types';
+import { VolatilityAnalysis } from './pages/VolatilityAnalysis';
+import type { BacktestParams, BacktestResults, AnalysisResults } from './types';
 
 const DEFAULT_PARAMS: BacktestParams = {
   symbol: 'SOFI',
@@ -55,7 +56,10 @@ const DEFAULT_PARAMS: BacktestParams = {
     moveUpPercent: 5,
     amountToBuy: 1000,
   },
-  timeframe: '1m'
+  timeframe: '1m',
+  startTime: '09:30',
+  endTime: '16:00',
+  marketHoursOnly: true
 };
 
 function App() {
@@ -69,7 +73,7 @@ function App() {
   const currentPage = location.pathname === '/how-it-works' ? 'guide' :
     location.pathname === '/updates' ? 'updates' :
       location.pathname === '/feedback' ? 'feedback' :
-        location.pathname === '/admin' ? 'admin' : 'simulator';
+        location.pathname === '/admin' ? 'admin' : 'results';
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -85,6 +89,8 @@ function App() {
     description: '',
     variant: 'default'
   });
+
+  const [mode, setMode] = useState<'strategies' | 'volatility'>('strategies');
 
   const mainContentRef = useRef<HTMLElement>(null);
 
@@ -148,8 +154,13 @@ function App() {
     summary: null
   });
 
+  const [volatilityResults, setVolatilityResults] = useState<AnalysisResults | null>(null);
+
   const [lastRunParams, setLastRunParams] = useState<BacktestParams | null>(null);
   const isStale = !!results.summary && lastRunParams && JSON.stringify(params) !== JSON.stringify(lastRunParams);
+
+  const [lastRunAnalysisParams, setLastRunAnalysisParams] = useState<BacktestParams | null>(null);
+  const isAnalysisStale = !!volatilityResults && lastRunAnalysisParams && JSON.stringify(params) !== JSON.stringify(lastRunAnalysisParams);
 
   const runBacktest = async () => {
     setMobileSidebarOpen(false);
@@ -197,6 +208,42 @@ function App() {
     }
   };
 
+  const runVolatilityAnalysis = async () => {
+    setMobileSidebarOpen(false);
+    setLoading(true);
+    try {
+      const payload = { ...params };
+      if (!params.marketHoursOnly) {
+        payload.startTime = '';
+        payload.endTime = '';
+      }
+
+      const response = await fetch('/api/volatility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      } else {
+        setVolatilityResults(data);
+        setLastRunAnalysisParams({ ...params });
+      }
+    } catch (error: any) {
+      console.error('Failed to run volatility analysis:', error);
+      setAlertConfig({
+        open: true,
+        title: 'Analysis Error',
+        description: error.message || 'Failed to connect to backend API',
+        variant: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateParam = (key: string, value: any) => {
     if (key.includes('.')) {
       const [parent, child] = key.split('.');
@@ -219,7 +266,9 @@ function App() {
       equityHistory: [],
       summary: null
     });
+    setVolatilityResults(null);
     setLastRunParams(null);
+    setLastRunAnalysisParams(null);
     setMobileSidebarOpen(false);
     navigate('/');
   };
@@ -232,6 +281,8 @@ function App() {
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <div className="h-screen bg-background text-foreground flex overflow-hidden font-sans">
         <Sidebar
+          mode={mode}
+          setMode={setMode}
           params={params}
           loading={loading}
           symbolsLoading={symbolsLoading}
@@ -243,6 +294,11 @@ function App() {
             setMobileSidebarOpen(false);
             navigate('/');
             runBacktest();
+          }}
+          onRunAnalysis={() => {
+            setMobileSidebarOpen(false);
+            navigate('/');
+            runVolatilityAnalysis();
           }}
           mobileOpen={mobileSidebarOpen}
           setMobileOpen={setMobileSidebarOpen}
@@ -272,7 +328,7 @@ function App() {
           </div>
           <div className="p-4 space-y-2">
             {[
-              { id: 'simulator', label: 'Simulator', icon: LineChart, path: '/' },
+              { id: 'results', label: 'Results', icon: LineChart, path: '/' },
               { id: 'guide', label: 'How it works', icon: BookOpen, path: '/how-it-works' },
               { id: 'updates', label: 'System Updates', icon: Activity, path: '/updates' },
               { id: 'feedback', label: 'Feedback', icon: MessageSquare, path: '/feedback' },
@@ -343,7 +399,7 @@ function App() {
                 className="flex flex-col text-left hover:opacity-80 transition-opacity active:scale-[0.98]"
               >
                 <h1 className="text-sm font-black tracking-tight uppercase leading-none">Quant Node</h1>
-                <span className="text-[10px] text-primary font-bold tracking-widest uppercase">Simulator</span>
+                <span className="text-[10px] text-primary font-bold tracking-widest uppercase">Results</span>
               </button>
             </div>
             <button
@@ -362,177 +418,213 @@ function App() {
             className="flex-1 p-4 md:p-8 overflow-y-auto relative w-full"
           >
             <Routes>
-              <Route path="/how-it-works" element={<StrategyGuide strategyId={params.strategyType} onBack={() => navigate('/')} />} />
+              <Route path="/how-it-works" element={<StrategyGuide strategyId={mode === 'volatility' ? 'volatility_analysis' : params.strategyType} onBack={() => navigate('/')} />} />
               <Route path="/updates" element={<Updates onBack={() => navigate('/')} />} />
               <Route path="/feedback" element={<Feedback onBack={() => navigate('/')} />} />
               <Route path="/admin" element={<Admin onBack={() => navigate('/')} />} />
               <Route path="/" element={
                 <>
-                  {isStale && !loading && !mobileSidebarOpen && (
-                    <div className="absolute inset-0 z-30 flex items-center justify-center animate-in fade-in duration-300">
-                      <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px]" />
-                      <div className="relative bg-card/90 border border-primary/50 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm glass mx-4">
-                        <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                          <Activity className="text-primary animate-pulse" size={24} />
+                  {mode === 'volatility' ? (
+                    <>
+                      {isAnalysisStale && !loading && !mobileSidebarOpen && (
+                        <div className="absolute inset-0 z-30 flex items-center justify-center animate-in fade-in duration-300">
+                          <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px]" />
+                          <div className="relative bg-card/90 border border-primary/50 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm glass mx-4">
+                            <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+                              <Activity className="text-primary animate-pulse" size={24} />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-bold">Settings Modified</h3>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Your parameters have changed. Run the simulation again to update the results with the new data.
+                              </p>
+                            </div>
+                            <button
+                              onClick={runVolatilityAnalysis}
+                              className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+                            >
+                              <Play size={16} fill="currentColor" />
+                              Update Analysis
+                            </button>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold">Settings Modified</h3>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Your parameters have changed. Run the simulation again to update the results with the new data.
-                          </p>
-                        </div>
-                        <button
-                          onClick={runBacktest}
-                          className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
-                        >
-                          <Play size={16} fill="currentColor" />
-                          Update Simulation
-                        </button>
+                      )}
+                      <div className={cn(
+                        "max-w-7xl mx-auto h-full flex flex-col transition-all duration-300",
+                        (isAnalysisStale && !loading) && "opacity-50 blur-[1px] pointer-events-none scale-[0.99]"
+                      )}>
+                        <VolatilityAnalysis results={volatilityResults} loading={loading} symbol={params.symbol} params={params} />
                       </div>
-                    </div>
-                  )}
-                  <div className={cn(
-                    "max-w-7xl mx-auto h-full flex flex-col transition-all duration-300",
-                    (isStale && !loading) && "opacity-50 blur-[1px] pointer-events-none scale-[0.99]"
-                  )}>
-                    {!results.summary && !loading ? (
-                      <WelcomeState
-                        onOpenSidebar={() => setMobileSidebarOpen(true)}
-                        onNavigateToGuide={() => navigate('/how-it-works')}
-                        onNavigateToFeedback={() => navigate('/feedback')}
-                      />
-                    ) : (
-                      <>
-                        <header className="flex flex-col sm:flex-row justify-between items-center sm:items-center gap-2 mb-4 md:mb-6">
-                          <div className="flex flex-col items-center sm:items-start w-full sm:w-auto text-center sm:text-left">
-                            <div className="animate-in slide-in-from-left duration-500">
-                              <div className="flex items-center justify-center sm:justify-start gap-2 text-muted-foreground text-xs mb-1 uppercase tracking-widest font-bold">
-                                <TrendingUp size={14} />
-                                Performance Overview
-                              </div>
-                              <h2 className="text-xl md:text-2xl font-black flex items-center justify-center sm:justify-start gap-2">
-                                {params.symbol} <span >Backtest</span>
-                              </h2>
+                    </>
+                  ) : (
+                    <>
+                      {isStale && !loading && !mobileSidebarOpen && (
+                        <div className="absolute inset-0 z-30 flex items-center justify-center animate-in fade-in duration-300">
+                          <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px]" />
+                          <div className="relative bg-card/90 border border-primary/50 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm glass mx-4">
+                            <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+                              <Activity className="text-primary animate-pulse" size={24} />
                             </div>
-                          </div>
-                          <div className="animate-in slide-in-from-right duration-500 w-full sm:w-auto flex justify-center sm:justify-end">
-                            <span className="text-[10px] md:text-sm bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium truncate">
-                              {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} - {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
-                            </span>
-                          </div>
-                        </header>
-
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                          <StatCard
-                            label="Total Net Worth"
-                            value={`$${results.summary?.finalAccountValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-                            icon={<DollarSign size={20} />}
-                            trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
-                            trendValue={results.summary ? `${results.summary.finalAccountValue >= results.summary.initialBalance ? '+' : ''}${(((results.summary.finalAccountValue / results.summary.initialBalance) - 1) * 100).toFixed(2)}%` : undefined}
-                            loading={loading}
-                          />
-                          <StatCard
-                            label="Total Profit"
-                            value={`$${results.summary?.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-                            icon={<TrendingUp size={20} />}
-                            trend={results.summary ? (results.summary.totalProfitRealized > 0) : null}
-                            loading={loading}
-                          />
-                          <StatCard
-                            label="Max Drawdown"
-                            value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
-                            icon={<TrendingDown size={20} />}
-                            loading={loading}
-                            subtitle={results.summary ? `${format(new Date(results.summary.maxDrawdownPeakTime), "MMM d, yy")} - ${format(new Date(results.summary.maxDrawdownTroughTime), "MMM d, yy")}` : undefined}
-                          />
-                          <StatCard
-                            label="Trades Executed"
-                            value={(results.trades?.length || 0).toString()}
-                            icon={<Activity size={20} />}
-                            loading={loading}
-                          />
-                          <StatCard
-                            label="Buy & Hold"
-                            value={`$${results.summary?.buyAndHoldFinalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-                            icon={<TrendingUp size={20} className="text-blue-400" />}
-                            trend={results.summary ? (results.summary.buyAndHoldFinalValue > results.summary.initialBalance) : null}
-                            trendValue={results.summary ? `${results.summary.buyAndHoldReturnPercent >= 0 ? '+' : ''}${results.summary.buyAndHoldReturnPercent.toFixed(2)}%` : undefined}
-                            loading={loading}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-                          <StatCard
-                            label="Available Cash"
-                            value={`$${results.summary?.currentCashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}`}
-                            icon={<Wallet size={20} className="text-blue-400" />}
-                            loading={loading}
-                          />
-                          <StatCard
-                            label="Unsold Shares"
-                            value={results.summary?.unsoldShares.toFixed(2) || '0'}
-                            icon={<Briefcase size={20} className="text-orange-400" />}
-                            loading={loading}
-                          />
-                          <StatCard
-                            label="Avg Cost Basis"
-                            value={`$${results.summary?.averagePriceUnsold.toFixed(2) || '0'}`}
-                            icon={<Target size={20} className="text-purple-400" />}
-                            loading={loading}
-                          />
-                          <StatCard
-                            label="All-Time High"
-                            value={`$${results.summary?.peakValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-                            icon={<TrendingUp size={20} className="text-primary" />}
-                            loading={loading}
-                          />
-                          <StatCard
-                            label="Peak Growth"
-                            value={`${results.summary ? (((results.summary.peakValue / results.summary.initialBalance) - 1) * 100).toFixed(2) : '0'}%`}
-                            icon={<Activity size={20} className="text-primary" />}
-                            loading={loading}
-                          />
-                        </div>
-
-                        {/* Chart Area */}
-                        <div className="p-4 md:p-8 rounded-2xl md:rounded-3xl border border-border glass rh-gradient relative overflow-hidden group min-h-[400px] md:min-h-[500px]">
-                          <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                          <div className="flex items-center justify-between mb-4 relative z-10">
-                            <h3 className="text-xl font-bold tracking-tight">Equity Curve</h3>
-                            <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                              <div className="flex items-center gap-2 text-primary">
-                                <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
-                                Portfolio Value
-                              </div>
+                            <div>
+                              <h3 className="text-lg font-bold">Settings Modified</h3>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Your parameters have changed. Run the simulation again to update the results with the new data.
+                              </p>
                             </div>
+                            <button
+                              onClick={runBacktest}
+                              className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+                            >
+                              <Play size={16} fill="currentColor" />
+                              Update Simulation
+                            </button>
                           </div>
-                          <div className="h-full w-full relative min-h-[300px] md:min-h-[400px]">
-                            {loading ? (
-                              <div className="h-full w-full flex flex-col items-center justify-center gap-6">
-                                <div className="h-full w-full bg-white/5 animate-pulse rounded-2xl" />
-                                <div className="absolute flex flex-col items-center gap-4 bg-background/40 backdrop-blur-md p-8 rounded-3xl border border-border">
-                                  <div className="h-12 w-12 border-4 border-primary/20 border-t-primary animate-spin rounded-full" />
-                                  <p className="text-lg font-bold text-primary animate-pulse tracking-widest uppercase font-mono">
-                                    {loadingMessage}
-                                  </p>
+                        </div>
+                      )}
+                      <div className={cn(
+                        "max-w-7xl mx-auto h-full flex flex-col transition-all duration-300",
+                        (isStale && !loading) && "opacity-50 blur-[1px] pointer-events-none scale-[0.99]"
+                      )}>
+                        {!results.summary && !loading ? (
+                          <WelcomeState
+                            onOpenSidebar={() => setMobileSidebarOpen(true)}
+                            onNavigateToGuide={() => navigate('/how-it-works')}
+                            onNavigateToFeedback={() => navigate('/feedback')}
+                          />
+                        ) : (
+                          <>
+                            <header className="flex flex-col sm:flex-row justify-between items-center sm:items-center gap-2 mb-4 md:mb-6">
+                              <div className="flex flex-col items-center sm:items-start w-full sm:w-auto text-center sm:text-left">
+                                <div className="animate-in slide-in-from-left duration-500">
+                                  <div className="flex items-center justify-center sm:justify-start gap-2 text-muted-foreground text-xs mb-1 uppercase tracking-widest font-bold">
+                                    <TrendingUp size={14} />
+                                    Performance Overview
+                                  </div>
+                                  <h2 className="text-xl md:text-2xl font-black flex items-center justify-center sm:justify-start gap-2">
+                                    {params.symbol} <span >Backtest</span>
+                                  </h2>
                                 </div>
                               </div>
-                            ) : (results.equityHistory?.length || 0) > 0 ? (
-                              <BacktestChart data={results.equityHistory} />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center text-muted-foreground border border-dashed border-border rounded-2xl min-h-[300px] md:min-h-[400px]">
-                                No chart data available
+                              <div className="animate-in slide-in-from-right duration-500 w-full sm:w-auto flex justify-center sm:justify-end">
+                                <span className="text-[10px] md:text-sm bg-muted px-3 py-1.5 rounded-full border border-border text-muted-foreground font-mono font-medium truncate">
+                                  {format(new Date(params.startDate + 'T00:00:00'), "MMM d, yyyy")} - {format(new Date(params.endDate + 'T00:00:00'), "MMM d, yyyy")}
+                                </span>
                               </div>
-                            )}
-                          </div>
-                        </div>
-                        {/* Trade History */}
-                        <div className="animate-in slide-in-from-bottom duration-700 pb-8 mt-6">
-                          <TradeTable trades={results.trades || []} loading={loading} />
-                        </div>
-                      </>
-                    )}
-                  </div>
+                            </header>
+
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                              <StatCard
+                                label="Total Net Worth"
+                                value={`$${results.summary?.finalAccountValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                                icon={<DollarSign size={20} />}
+                                trend={results.summary ? (results.summary.finalAccountValue > results.summary.initialBalance) : null}
+                                trendValue={results.summary ? `${results.summary.finalAccountValue >= results.summary.initialBalance ? '+' : ''}${(((results.summary.finalAccountValue / results.summary.initialBalance) - 1) * 100).toFixed(2)}%` : undefined}
+                                loading={loading}
+                              />
+                              <StatCard
+                                label="Total Profit"
+                                value={`$${results.summary?.totalProfitRealized.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                                icon={<TrendingUp size={20} />}
+                                trend={results.summary ? (results.summary.totalProfitRealized > 0) : null}
+                                loading={loading}
+                              />
+                              <StatCard
+                                label="Max Drawdown"
+                                value={`${results.summary?.maxDrawdownPercent.toFixed(2) || '0'}%`}
+                                icon={<TrendingDown size={20} />}
+                                loading={loading}
+                                subtitle={results.summary ? `${format(new Date(results.summary.maxDrawdownPeakTime), "MMM d, yy")} - ${format(new Date(results.summary.maxDrawdownTroughTime), "MMM d, yy")}` : undefined}
+                              />
+                              <StatCard
+                                label="Trades Executed"
+                                value={(results.trades?.length || 0).toString()}
+                                icon={<Activity size={20} />}
+                                loading={loading}
+                              />
+                              <StatCard
+                                label="Buy & Hold"
+                                value={`$${results.summary?.buyAndHoldFinalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                                icon={<TrendingUp size={20} className="text-blue-400" />}
+                                trend={results.summary ? (results.summary.buyAndHoldFinalValue > results.summary.initialBalance) : null}
+                                trendValue={results.summary ? `${results.summary.buyAndHoldReturnPercent >= 0 ? '+' : ''}${results.summary.buyAndHoldReturnPercent.toFixed(2)}%` : undefined}
+                                loading={loading}
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                              <StatCard
+                                label="Available Cash"
+                                value={`$${results.summary?.currentCashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }) || '0'}`}
+                                icon={<Wallet size={20} className="text-blue-400" />}
+                                loading={loading}
+                              />
+                              <StatCard
+                                label="Unsold Shares"
+                                value={results.summary?.unsoldShares.toFixed(2) || '0'}
+                                icon={<Briefcase size={20} className="text-orange-400" />}
+                                loading={loading}
+                              />
+                              <StatCard
+                                label="Avg Cost Basis"
+                                value={`$${results.summary?.averagePriceUnsold.toFixed(2) || '0'}`}
+                                icon={<Target size={20} className="text-purple-400" />}
+                                loading={loading}
+                              />
+                              <StatCard
+                                label="All-Time High"
+                                value={`$${results.summary?.peakValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                                icon={<TrendingUp size={20} className="text-primary" />}
+                                loading={loading}
+                              />
+                              <StatCard
+                                label="Peak Growth"
+                                value={`${results.summary ? (((results.summary.peakValue / results.summary.initialBalance) - 1) * 100).toFixed(2) : '0'}%`}
+                                icon={<Activity size={20} className="text-primary" />}
+                                loading={loading}
+                              />
+                            </div>
+
+                            {/* Chart Area */}
+                            <div className="p-4 md:p-8 rounded-2xl md:rounded-3xl border border-border glass rh-gradient relative overflow-hidden group min-h-[400px] md:min-h-[500px]">
+                              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                              <div className="flex items-center justify-between mb-4 relative z-10">
+                                <h3 className="text-xl font-bold tracking-tight">Equity Curve</h3>
+                                <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                                  <div className="flex items-center gap-2 text-primary">
+                                    <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
+                                    Portfolio Value
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="h-full w-full relative min-h-[300px] md:min-h-[400px]">
+                                {loading ? (
+                                  <div className="h-full w-full flex flex-col items-center justify-center gap-6">
+                                    <div className="h-full w-full bg-white/5 animate-pulse rounded-2xl" />
+                                    <div className="absolute flex flex-col items-center gap-4 bg-background/40 backdrop-blur-md p-8 rounded-3xl border border-border">
+                                      <div className="h-12 w-12 border-4 border-primary/20 border-t-primary animate-spin rounded-full" />
+                                      <p className="text-lg font-bold text-primary animate-pulse tracking-widest uppercase font-mono">
+                                        {loadingMessage}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : (results.equityHistory?.length || 0) > 0 ? (
+                                  <BacktestChart data={results.equityHistory} />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center text-muted-foreground border border-dashed border-border rounded-2xl min-h-[300px] md:min-h-[400px]">
+                                    No chart data available
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {/* Trade History */}
+                            <div className="animate-in slide-in-from-bottom duration-700 pb-8 mt-6">
+                              <TradeTable trades={results.trades || []} loading={loading} />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </>
               } />
             </Routes>
