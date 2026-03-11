@@ -17,7 +17,7 @@ export function VolatilityAnalysis({ results, loading, symbol, params }: Volatil
                 <div>
                     <h1 className="text-2xl md:text-3xl font-black flex items-center gap-3 tracking-tight mb-2">
                         <BarChart2 className="text-primary" size={28} />
-                        {symbol} Volatility Analysis
+                        {symbol.replace(/^\$/, '')} Volatility Analysis
                     </h1>
                     {!results ? (
                         <p className="text-muted-foreground text-sm font-medium">Analyze asset price ranges, volatility, and absolute price volatility for any defined period.</p>

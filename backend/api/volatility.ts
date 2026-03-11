@@ -82,31 +82,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             }
 
-            const periods = Array.from(groups.values()).map(g => {
-                const volatilityPct = g.low > 0 ? ((g.high - g.low) / g.low) * 100 : 0;
-                return { ...g, volatilityPct };
-            });
+            const periods = Array.from(groups.values());
 
             if (periods.length === 0) return null;
 
-            let maxPeriod = periods[0];
-            let minPeriod = periods[0];
-            let sumVolatility = 0;
-
-            for (const p of periods) {
-                if (p.volatilityPct > maxPeriod.volatilityPct) {
-                    maxPeriod = p;
-                }
-                if (p.volatilityPct < minPeriod.volatilityPct) {
-                    minPeriod = p;
-                }
-                sumVolatility += p.volatilityPct;
-            }
-
             return {
-                averageVolatility: sumVolatility / periods.length,
-                maxVolatility: maxPeriod,
-                minVolatility: minPeriod,
                 periodsCount: periods.length,
                 allPeriods: periods
             };

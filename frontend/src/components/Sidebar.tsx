@@ -162,7 +162,7 @@ export function Sidebar({ mode, setMode, params, loading, availableSymbols = [],
                             <SelectContent className="bg-popover border-border">
                                 {availableSymbols.map((symbol) => (
                                     <SelectItem key={symbol} value={symbol}>
-                                        {symbol}
+                                        {symbol.replace(/^\$/, '')}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

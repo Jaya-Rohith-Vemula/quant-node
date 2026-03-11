@@ -501,7 +501,7 @@ function App() {
                                     Performance Overview
                                   </div>
                                   <h2 className="text-xl md:text-2xl font-black flex items-center justify-center sm:justify-start gap-2">
-                                    {params.symbol} <span >Backtest</span>
+                                    {params.symbol.replace(/^\$/, '')} <span >Backtest</span>
                                   </h2>
                                 </div>
                               </div>
