@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Plus, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -72,16 +72,35 @@ const VolatilityDetail = ({ label, volatility, timeFormat, metricKey }: { label:
     );
 };
 
+export interface FilterCondition {
+    id: string;
+    metricKey: string;
+    operator: '>' | '<' | '=';
+    targetPct: string;
+}
+
 export const VolatilityCard = ({ title, data }: { title: string, data: PeriodResult | null }) => {
     const [metricKey, setMetricKey] = useState<string>('volatilityPct');
-    const [operator, setOperator] = useState<'>' | '<' | '='>('<');
-    const [targetPct, setTargetPct] = useState<string>('1.0');
+    const [filters, setFilters] = useState<FilterCondition[]>([
+        { id: '1', metricKey: 'volatilityPct', operator: '<', targetPct: '1.0' }
+    ]);
     const [showDetails, setShowDetails] = useState(false);
 
     if (!data || !data.allPeriods || data.allPeriods.length === 0) return null;
 
     const timeFormat = title === 'Daily Volatility' ? 'HH:mm' : 'MMM d, yyyy, HH:mm';
-    const targetValue = parseFloat(targetPct) || 0;
+
+    const addFilter = () => {
+        setFilters([...filters, { id: Math.random().toString(36).substring(7), metricKey: 'volatilityPct', operator: '<', targetPct: '1.0' }]);
+    };
+
+    const updateFilter = (id: string, field: keyof FilterCondition, value: string) => {
+        setFilters(filters.map(f => f.id === id ? { ...f, [field]: value } : f));
+    };
+
+    const removeFilter = (id: string) => {
+        setFilters(filters.filter(f => f.id !== id));
+    };
 
     let sum = 0;
     let max = data.allPeriods[0];
@@ -101,10 +120,14 @@ export const VolatilityCard = ({ title, data }: { title: string, data: PeriodRes
     };
 
     const filteredPeriods = data.allPeriods.filter(p => {
-        const pct = getMetricVal(p, metricKey);
-        if (operator === '>') return pct > targetValue;
-        if (operator === '<') return pct < targetValue;
-        return Math.abs(pct - targetValue) < 0.1; // fuzzy match for float equal
+        if (filters.length === 0) return true;
+        return filters.every(f => {
+            const pct = getMetricVal(p, f.metricKey);
+            const targetValue = parseFloat(f.targetPct) || 0;
+            if (f.operator === '>') return pct > targetValue;
+            if (f.operator === '<') return pct < targetValue;
+            return Math.abs(pct - targetValue) < 0.1; // fuzzy match for float equal
+        });
     });
 
     return (
@@ -142,37 +165,78 @@ export const VolatilityCard = ({ title, data }: { title: string, data: PeriodRes
             </div>
 
             <div className="bg-background/30 rounded-lg p-4 border border-border/30">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Filter Volatilities</span>
-                    <div className="flex items-center gap-2">
-                        <Select value={operator} onValueChange={(val: '>' | '<' | '=') => setOperator(val)}>
-                            <SelectTrigger className="w-[140px] bg-secondary/50 border-border h-9 text-sm font-bold focus:ring-1 focus:ring-primary">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-popover border-border">
-                                <SelectItem value=">">Greater Than (&gt;)</SelectItem>
-                                <SelectItem value="<">Lesser Than (&lt;)</SelectItem>
-                                <SelectItem value="=">Equal To (=)</SelectItem>
-                            </SelectContent>
-                        </Select>
+                <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 mb-4">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground w-full xl:w-auto">Filters</span>
+                    
+                    <div className="flex flex-col gap-2 w-full xl:flex-1">
+                        {filters.length === 0 && (
+                            <div className="text-sm text-muted-foreground italic">No filters applied.</div>
+                        )}
+                        {filters.map((f) => (
+                            <div key={f.id} className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                                <Select value={f.metricKey} onValueChange={(val) => updateFilter(f.id, 'metricKey', val)}>
+                                    <SelectTrigger className="w-[160px] bg-secondary/50 border-border h-9 text-xs font-bold focus:ring-1 focus:ring-primary uppercase tracking-wider">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-popover border-border">
+                                        <SelectItem value="volatilityPct">High to Low</SelectItem>
+                                        <SelectItem value="openHighPct">Open to High</SelectItem>
+                                        <SelectItem value="highClosePct">High to Close</SelectItem>
+                                        <SelectItem value="openLowPct">Open to Low</SelectItem>
+                                        <SelectItem value="lowClosePct">Low to Close</SelectItem>
+                                        <SelectItem value="openClosePct">Open to Close</SelectItem>
+                                    </SelectContent>
+                                </Select>
 
-                        <div className="relative">
-                            <input
-                                type="number"
-                                step="0.1"
-                                value={targetPct}
-                                onChange={(e) => setTargetPct(e.target.value)}
-                                className="w-24 bg-secondary/50 border border-border rounded-lg h-9 pl-3 pr-6 text-sm font-bold focus:ring-1 focus:ring-primary outline-none transition-colors"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">%</span>
-                        </div>
+                                <Select value={f.operator} onValueChange={(val: any) => updateFilter(f.id, 'operator', val)}>
+                                    <SelectTrigger className="w-[140px] bg-secondary/50 border-border h-9 text-sm font-bold focus:ring-1 focus:ring-primary">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-popover border-border">
+                                        <SelectItem value=">">Greater Than (&gt;)</SelectItem>
+                                        <SelectItem value="<">Lesser Than (&lt;)</SelectItem>
+                                        <SelectItem value="=">Equal To (=)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        value={f.targetPct}
+                                        onChange={(e) => updateFilter(f.id, 'targetPct', e.target.value)}
+                                        className="w-24 bg-secondary/50 border border-border rounded-lg h-9 pl-3 pr-6 text-sm font-bold focus:ring-1 focus:ring-primary outline-none transition-colors"
+                                    />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">%</span>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeFilter(f.id)}
+                                    className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                                >
+                                    <X size={16} />
+                                </Button>
+                            </div>
+                        ))}
                     </div>
 
-                    <div className="sm:ml-auto flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-3 py-1.5 rounded-lg font-mono font-bold text-sm">
-                        <span>{filteredPeriods.length}</span>
-                        <span className="text-primary/70 font-sans text-xs">
-                            / {data.periodsCount} ({((filteredPeriods.length / data.periodsCount) * 100).toFixed(1)}%)
-                        </span>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center xl:ml-auto w-full xl:w-auto">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={addFilter}
+                            className="h-9 border-border/50 hover:bg-secondary/70 text-xs font-bold uppercase tracking-widest flex items-center gap-1 w-full sm:w-auto"
+                        >
+                            <Plus size={14} /> Add Filter
+                        </Button>
+
+                        <div className="flex justify-center items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-3 py-1.5 rounded-lg font-mono font-bold text-sm w-full sm:w-auto shrink-0">
+                            <span>{filteredPeriods.length}</span>
+                            <span className="text-primary/70 font-sans text-xs">
+                                / {data.periodsCount} ({((filteredPeriods.length / data.periodsCount) * 100).toFixed(1)}%)
+                            </span>
+                        </div>
                     </div>
                 </div>
 
